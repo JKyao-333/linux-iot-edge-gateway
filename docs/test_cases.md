@@ -82,3 +82,73 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 - 串口断开后能够自动重连。
 - MQTT 离线数据能够缓存和补传。
 - 一条 Shell 命令能够完成构建与测试。
+## 8. TCP 上报测试
+
+### TCP-01：正常连接与 JSON 发送
+
+前置条件：
+
+- TCP 端口 `9000` 未被占用
+- `tcp_client_test` 已成功编译
+
+测试步骤：
+
+1. 启动 `scripts/mock_tcp_server.py`
+2. C++ 客户端连接 `127.0.0.1:9000`
+3. 客户端发送一条 JSON
+4. 服务端按照换行符提取完整消息
+
+预期结果：
+
+- 客户端输出 `TCP connected`
+- 客户端输出 `TCP send ok`
+- 客户端输出 `TCP test passed`
+- 服务端输出完整的 `[RX]` JSON
+- 脚本输出 `[PASS] TCP smoke test passed`
+
+自动化命令：
+
+`./scripts/run_tcp_smoke_test.sh`
+
+### TCP-02：TCP 服务端离线
+
+前置条件：
+
+- `9000` 端口没有 TCP 服务端监听
+- Mosquitto 正常运行
+
+测试步骤：
+
+1. 启动边缘网关
+2. 通过虚拟串口发送合法传感器帧
+3. 观察 MQTT 和 TCP 日志
+
+预期结果：
+
+- MQTT 数据仍能正常发布
+- TCP 客户端报告连接失败
+- 网关记录 `TCP publish failed`
+- 网关进程不会因 TCP 失败退出
+
+### TCP-03：MQTT 与 TCP 双通道上报
+
+前置条件：
+
+- Mosquitto 正在监听 `1883`
+- Python TCP 服务端正在监听 `9000`
+- 虚拟串口设备已经创建
+
+测试步骤：
+
+1. 启动 MQTT 订阅端
+2. 启动 Python TCP 服务端
+3. 启动边缘网关
+4. Python 串口模拟器发送一帧合法数据
+
+预期结果：
+
+- 网关成功解析协议帧
+- MQTT 订阅端收到传感器 JSON
+- TCP 服务端收到相同的传感器 JSON
+- 网关输出 `mqtt publish ok`
+- 网关输出 `TCP send ok`

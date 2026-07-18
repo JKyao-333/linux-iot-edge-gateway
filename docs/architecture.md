@@ -194,8 +194,50 @@ ReliablePublisher 负责：
 
 - 接入 Eclipse Paho 或 libmosquitto
 - 抽象 Publisher 接口
-- 增加原生 TCP 上报实现
 - 增加 YAML 配置加载
 - 将文件缓存升级为 SQLite
 - 增加多串口和多设备并发
 - 增加 systemd 服务和交叉编译支持
+## 8. 原生 TCP 上报
+
+### 8.1 模块文件
+
+- `src/tcp/tcp_client.h`
+- `src/tcp/tcp_client.cpp`
+
+`TcpClient` 基于 Linux POSIX Socket API 实现，负责：
+
+- 使用 `getaddrinfo()`解析服务器地址
+- 使用 `socket()` 创建 TCP Socket
+- 使用 `connect()` 建立连接
+- 使用 `send()` 循环发送完整数据
+- 使用 `MSG_NOSIGNAL` 避免断线时触发 SIGPIPE
+- 发送失败后关闭失效连接
+- 后续发送时自动重新连接
+
+### 8.2 消息边界
+
+TCP 是字节流协议，不保留应用层消息边界。
+
+本项目采用 JSON Lines 格式：
+
+`一条 JSON + 一个换行符`
+
+TCP 服务端持续缓存接收到的字节，并以换行符拆分完整 JSON，从而处理半包和粘包。
+
+### 8.3 双通道数据链路
+
+合法传感器数据经过清洗和 JSON 封装后，同时进入两条上报链路：
+
+1. MQTT：发布到 `sensor/<device_id>/data`
+2. TCP：发送到 `127.0.0.1:9000`
+
+MQTT 和 TCP 相互独立。一条链路发布失败不会阻止另一条链路继续工作。
+
+### 8.4 TCP 测试
+
+- `tests/tcp_client_test.cpp`：C++ TCP 客户端测试
+- `scripts/mock_tcp_server.py`：Python TCP 模拟服务端
+- `scripts/run_tcp_smoke_test.sh`：TCP 自动化 smoke test
+
+总测试入口 `scripts/run_smoke_test.sh` 会依次运行 CTest、串口到 MQTT 测试和 TCP 收发测试。

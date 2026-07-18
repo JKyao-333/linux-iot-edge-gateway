@@ -13,6 +13,7 @@
 #include <string>
 #include "log/logger.h"
 #include <chrono>
+#include "tcp/tcp_client.h"
 #include <thread>
 static bool configure_serial(int fd, speed_t baudrate) {
     termios tty{};
@@ -120,8 +121,11 @@ static void print_frame(const protocol::Frame& frame) {
 static std::string build_mqtt_topic(const app::SensorData& sensor_data) {
     return "sensor/" + std::to_string(static_cast<int>(sensor_data.device_id)) + "/data";
 }
-
-static void handle_frame(const protocol::Frame& frame,mqtt::ReliablePublisher& publisher,logging::Logger& logger) {
+static void handle_frame(
+    const protocol::Frame& frame,
+    mqtt::ReliablePublisher& publisher,
+    tcp::TcpClient& tcp_client,
+    logging::Logger& logger) {
     print_frame(frame);
 
     app::SensorData sensor_data;
@@ -137,7 +141,13 @@ static void handle_frame(const protocol::Frame& frame,mqtt::ReliablePublisher& p
 
         const std::string topic = build_mqtt_topic(sensor_data);
         publisher.publish(topic, json);
-    } else {
+           if (!tcp_client.send_json(json)) {
+            logger.warn(
+                "tcp",
+                "TCP publish failed"
+            );
+        }
+     } else {
         logger.warn(
     "sensor",
     "invalid data: " + json
@@ -196,6 +206,10 @@ logger.info(
 mqtt::ReliablePublisher publisher(
     mqtt_client,
     file_cache
+);
+tcp::TcpClient tcp_client(
+    "127.0.0.1",
+    9000
 );
 logger.info(
     "cache",
@@ -284,7 +298,12 @@ if (length_error_count > 0) {
     );
 }
 	for (const auto& frame : frames) {
-          handle_frame(frame, publisher,logger);
+handle_frame(
+    frame,
+    publisher,
+    tcp_client,
+    logger
+);
         }
     }
 

@@ -31,4 +31,9 @@ ctest \
 echo "[INFO] running serial-to-MQTT smoke test"
 
 "${PROJECT_DIR}/scripts/run_serial_smoke_test.sh"
+
+echo "[INFO] running TCP smoke test"
+
+"${PROJECT_DIR}/scripts/run_tcp_smoke_test.sh"
+
 echo "[PASS] all smoke tests passed"

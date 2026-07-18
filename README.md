@@ -1,9 +1,7 @@
 # Linux C++ 多协议物联网边缘网关
 
-基于 Linux C++17 实现的物联网边缘网关，用于连接 STM32 多传感器终端与 MQTT Broker。
-
-网关接收物理串口或 Python 虚拟串口数据，完成自定义协议解析、CRC16 校验、数据清洗、JSON 封装、MQTT 上报、离线缓存、恢复补传、串口自动重连和日志记录。
-
+基于 Linux C++17 实现的多协议物联网边缘网关，用于连接 STM32 多传感器终端、MQTT Broker 和 TCP Server。
+网关接收物理串口或 Python 虚拟串口数据，完成自定义协议解析、CRC16 校验、数据清洗、JSON 封装、MQTT/TCP 双通道上报、MQTT 离线缓存、恢复补传、串口自动重连和日志记录。
 ## 核心能力
 
 - termios 串口配置与原始字节接收
@@ -14,6 +12,9 @@
 - 传感器数据范围检查
 - JSON 数据封装
 - MQTT Topic 动态生成
+- 基于 POSIX Socket 的原生 TCP 客户端
+- 使用 JSON Lines 解决 TCP 消息边界问题
+- MQTT 与 TCP 双通道数据上报
 - Broker 离线消息落盘
 - Broker 恢复后缓存补传
 - 串口断开检测与自动重连
@@ -79,6 +80,7 @@ MQTT Topic：
 - `src/protocol/`：协议帧、CRC16 和流式解析器
 - `src/app/`：SensorData、数据清洗和 JSON
 - `src/mqtt/`：MQTT 客户端和可靠发布器
+- `src/tcp/`：原生 TCP Socket 客户端
 - `src/cache/`：本地文件缓存
 - `src/log/`：分级日志
 - `scripts/`：模拟器和自动化测试脚本
@@ -205,6 +207,8 @@ Ubuntu 安装命令：
 - 数据解析、清洗和 JSON 测试通过
 - MQTT 发布、离线缓存和补传测试通过
 - 串口到 MQTT 端到端 smoke test 通过
+- C++ TCP 客户端与 Python TCP 服务端 smoke test 通过
+- 串口数据同时上报 MQTT 与 TCP 的手工联调通过
 - 串口断开与恢复测试通过
 
 ## 项目文档
@@ -222,7 +226,6 @@ Ubuntu 安装命令：
 
 ## 后续计划
 
-- 增加原生 TCP 上报
 - 增加 YAML 配置加载
 - 将文件缓存升级为 SQLite
 - 抽象统一 Publisher 接口

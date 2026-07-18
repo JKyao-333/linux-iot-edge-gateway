@@ -31,6 +31,24 @@ target_include_directories(mqtt_client
     PUBLIC
         src
 )
+add_library(tcp_client
+    src/tcp/tcp_client.cpp
+)
+
+target_include_directories(tcp_client
+    PUBLIC
+        src
+
+)
+add_executable(tcp_client_test
+    tests/tcp_client_test.cpp
+)
+
+target_link_libraries(tcp_client_test
+    PRIVATE
+        tcp_client
+)
+
 target_link_libraries(app_core
     PUBLIC
         protocol
@@ -72,6 +90,7 @@ add_executable(edge_gateway
 target_link_libraries(edge_gateway
     PRIVATE
         protocol
+	tcp_client
         app_core
         mqtt_client
         logger
