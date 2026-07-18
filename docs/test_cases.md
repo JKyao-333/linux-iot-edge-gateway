@@ -1,0 +1,84 @@
+# 测试用例说明
+
+## 1. 测试目标
+
+项目测试覆盖 CRC16、自定义协议解析、半包与粘包、异常帧过滤、传感器数据清洗、JSON 封装、MQTT 发布、离线缓存、恢复补传、串口重连和日志记录。
+
+## 2. 测试环境
+
+- Ubuntu 22.04 / WSL2
+- GCC 11 / C++17
+- CMake 3.22
+- Python 3.10 / pyserial
+- socat
+- Mosquitto 2.0
+
+## 3. 自动化测试命令
+
+启动 Broker：`sudo service mosquitto start`
+
+运行全部测试：`./scripts/run_smoke_test.sh`
+
+仅运行 CTest：`ctest --test-dir ~/linux-iot-edge-gateway-build --output-on-failure`
+
+通过标准：18 个 CTest 和串口到 MQTT 端到端测试全部通过。
+
+## 4. C++ 测试矩阵
+
+| 编号 | 测试目标 | 验证内容 |
+|---|---|---|
+| TC-001 | crc16_test | CRC16-Modbus 计算 |
+| TC-002 | frame_test | 协议帧字段与 CRC |
+| TC-003 | frame_parser_test | 单个完整帧解析 |
+| TC-004 | frame_parser_stream_test | 粘包解析 |
+| TC-005 | frame_parser_half_test | 半包缓存与拼接 |
+| TC-006 | frame_parser_bad_crc_test | CRC 错误帧过滤 |
+| TC-007 | frame_parser_crc_diagnostic_test | CRC 错误计数 |
+| TC-008 | frame_parser_length_diagnostic_test | 非法长度检测与恢复 |
+| TC-009 | sensor_data_struct_test | SensorData 字段 |
+| TC-010 | sensor_data_parse_test | Payload 字段解析 |
+| TC-011 | sensor_data_validate_test | 数据范围检查 |
+| TC-012 | sensor_data_json_test | JSON 序列化 |
+| TC-013 | file_cache_test | 缓存追加与读取 |
+| TC-014 | file_cache_replace_test | 缓存原子替换 |
+| TC-015 | reliable_publisher_test | 发布失败后缓存 |
+| TC-016 | logger_test | 四级日志输出 |
+| TC-017 | mqtt_client_test | MQTT 消息发布 |
+| TC-018 | cache_replay_test | 缓存恢复补传 |
+
+## 5. 端到端与故障测试
+
+| 编号 | 测试场景 | 预期结果 |
+|---|---|---|
+| ET-001 | Python 分两次发送一个帧 | 网关只解析并上报一次 |
+| ET-002 | 两个完整帧一次写入 | 网关解析并上报两次 |
+| FT-001 | CRC 错误帧后跟正常帧 | 错误帧丢弃，正常帧解析 |
+| FT-002 | 非法长度帧后跟正常帧 | 记录长度错误并恢复解析 |
+| FT-003 | 启动时串口不存在 | 每 2 秒重试且进程不退出 |
+| FT-004 | 运行中串口断开再恢复 | 自动重连并继续接收数据 |
+| FT-005 | MQTT Broker 离线 | 发布失败消息写入本地缓存 |
+| FT-006 | MQTT Broker 恢复 | 缓存消息补传并从文件删除 |
+
+## 6. 串口端到端测试
+
+运行命令：`./scripts/run_serial_smoke_test.sh`
+
+测试链路：
+
+Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON -> MQTT
+
+通过标准：
+
+- 两段串口数据组成一个完整帧。
+- 只生成一条传感器 JSON。
+- MQTT 发布成功。
+- 无 CRC 或长度错误。
+
+## 7. 阶段验收标准
+
+- 18 个 CTest 全部通过。
+- 串口到 MQTT smoke test 通过。
+- 半包、粘包和异常帧处理正确。
+- 串口断开后能够自动重连。
+- MQTT 离线数据能够缓存和补传。
+- 一条 Shell 命令能够完成构建与测试。
