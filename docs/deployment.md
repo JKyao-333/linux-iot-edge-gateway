@@ -116,3 +116,27 @@
 `sudo ./scripts/uninstall_systemd_service.sh --purge`
 
 `--purge` 会永久删除 `/etc`、`/var/lib` 和 `/var/log` 下的网关目录，应确认数据无需保留后再执行。
+
+## 8. ARM64 设备部署
+
+在 x86_64 Ubuntu / WSL2 开发机执行：
+
+`./scripts/setup_aarch64_sysroot.sh`
+
+`./scripts/build_aarch64.sh`
+
+默认部署包位于：
+
+`/mnt/d/Tools/linux-iot-edge-gateway/artifacts/linux-iot-edge-gateway-aarch64.tar.gz`
+
+将部署包传到 ARM64 Ubuntu 22.04 设备后，先安装运行时依赖：
+
+`sudo apt install -y libyaml-cpp0.7 libmosquitto1 libsqlite3-0`
+
+检查包内容后解压到根目录：
+
+`tar -tzf linux-iot-edge-gateway-aarch64.tar.gz`
+
+`sudo tar -xzf linux-iot-edge-gateway-aarch64.tar.gz -C /`
+
+随后按照本指南创建运行用户、数据目录和日志目录，再启用服务。首次部署应先执行 `file /usr/local/bin/edge_gateway`，确认输出包含 `ARM aarch64`。

@@ -237,12 +237,13 @@ ReliablePublisher 负责：
 
 ## 6. 测试架构
 
-测试分为四层：
+测试分为五层：
 
 1. C++ 单元测试：验证 CRC、解析器、业务数据、缓存和日志。
 2. MQTT 集成测试：验证发布、缓存恢复、用户名认证和 TLS 握手。
 3. 串口端到端测试：验证 Python、PTY、网关和 MQTT 完整链路，包括两个串口并发接入。
 4. 进程生命周期测试：验证信号捕获和 SIGTERM 优雅退出。
+5. 跨平台构建测试：验证 ARM64 依赖 sysroot、AArch64 ELF 和 QEMU 启动。
 
 统一入口：
 
@@ -252,9 +253,15 @@ ReliablePublisher 负责：
 
 当前版本已经使用 `libmosquitto` 实现原生 MQTT 长连接、QoS 1 发布确认、自动重连、用户名认证和 TLS 加密。ReliablePublisher 通过 `MessageCache` 接口访问缓存，默认使用 SQLite 持久化队列，并在 Broker 恢复后按顺序补传。
 
-后续可扩展：
+ARM64 版本通过 GNU AArch64 交叉编译器构建。构建脚本从 Ubuntu Ports 下载 ARM64 版本的 yaml-cpp、SQLite 和 Mosquitto 依赖，解包为独立 sysroot，避免修改开发机原有的软件包架构配置。CMake 工具链文件限制头文件和库搜索范围，防止错误链接 x86_64 依赖。
 
-- 增加 ARM 交叉编译支持
+构建完成后依次执行三项验证：
+
+1. `file` 检查产物为 ARM aarch64 ELF。
+2. `readelf` 检查 ELF Machine 和动态依赖。
+3. `qemu-aarch64` 启动程序并验证配置错误退出路径。
+
+验证通过后，将程序、生产配置和 systemd 服务单元打包为可部署的 `tar.gz`。
 ## 8. 原生 TCP 上报
 
 ### 8.1 模块文件

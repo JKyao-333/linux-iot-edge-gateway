@@ -13,6 +13,7 @@
 - socat
 - Mosquitto 2.0
 - OpenSSL 3
+- GNU AArch64 交叉编译器 / QEMU user mode
 
 ## 3. 自动化测试命令
 
@@ -23,6 +24,8 @@
 仅运行 CTest：`ctest --test-dir ~/linux-iot-edge-gateway-build --output-on-failure`
 
 通过标准：24 个 CTest、单串口与双串口 MQTT 端到端测试、MQTT 认证与 TLS smoke test、TCP smoke test 和缓存迁移测试全部通过。
+
+ARM64 构建验证：`./scripts/build_aarch64.sh`
 ## 4. C++ 测试矩阵
 
 | 编号 | 测试目标 | 验证内容 |
@@ -259,3 +262,21 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 - `systemctl status linux-iot-edge-gateway` 显示 active
 - `systemctl stop` 后日志记录正常停止
 - 异常退出后 systemd 根据 `Restart=on-failure` 自动拉起
+
+## 11. ARM64 交叉构建测试
+
+### ARM-01：依赖 sysroot 隔离
+
+执行 `./scripts/setup_aarch64_sysroot.sh`，确认 ARM64 依赖下载到独立目录，并生成 `gateway-sysroot.manifest`。脚本不得修改宿主机已安装的软件包架构。
+
+### ARM-02：ELF 架构检查
+
+执行 `./scripts/build_aarch64.sh`，预期 `file` 输出包含 `ARM aarch64`，`readelf -h` 的 Machine 为 `AArch64`，且动态依赖来自 ARM64 sysroot。
+
+### ARM-03：QEMU 启动检查
+
+构建脚本使用 `qemu-aarch64` 启动交叉编译产物，并传入不存在的配置文件。预期程序成功进入配置加载逻辑，输出 `load config failed:` 并以状态码 `1` 退出。
+
+### ARM-04：部署包检查
+
+预期生成 `linux-iot-edge-gateway-aarch64.tar.gz`，包内包含网关程序、生产 YAML 配置和 systemd 服务单元。

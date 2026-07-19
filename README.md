@@ -23,6 +23,7 @@
 - systemd 后台服务与故障拉起
 - DEBUG、INFO、WARN、ERROR 日志
 - Python、Shell 和 CTest 自动化测试
+- AArch64 交叉编译、QEMU 启动校验和部署包生成
 
 ## 数据链路
 
@@ -180,6 +181,29 @@ Ubuntu 安装命令：
 
 `~/linux-iot-edge-gateway-build/edge_gateway`
 
+### ARM64 交叉编译
+
+安装交叉编译与模拟运行工具：
+
+`sudo apt install -y g++-aarch64-linux-gnu qemu-user file pkg-config`
+
+准备 ARM64 依赖 sysroot。默认下载和解包到 D 盘，避免占用系统盘：
+
+`./scripts/setup_aarch64_sysroot.sh`
+
+构建、检查 ELF 架构、使用 QEMU 验证程序能够启动，并生成部署包：
+
+`./scripts/build_aarch64.sh`
+
+默认输出：
+
+- 构建目录：`~/linux-iot-edge-gateway-build-aarch64`
+- ARM64 ELF：`~/linux-iot-edge-gateway-build-aarch64/edge_gateway`
+- 依赖 sysroot：`/mnt/d/Tools/linux-iot-edge-gateway/aarch64-sysroot`
+- 部署包：`/mnt/d/Tools/linux-iot-edge-gateway/artifacts/linux-iot-edge-gateway-aarch64.tar.gz`
+
+CI 会在独立的 Ubuntu 22.04 环境中重复执行原生测试和 ARM64 交叉构建，并上传 ARM64 部署包。
+
 ## 一键测试
 
 启动 Mosquitto：
@@ -297,6 +321,7 @@ Ubuntu 安装命令：
 - 串口数据同时上报 MQTT 与 TCP 的手工联调通过
 - 串口断开与恢复测试通过
 - SIGINT/SIGTERM 单元测试和进程优雅退出 smoke test 通过
+- ARM64 交叉编译、ELF 架构检查和 QEMU 启动测试通过
 
 ## 项目文档
 
@@ -321,4 +346,5 @@ MQTT 与 TCP 均实现统一的 `Publisher` 接口。`PublisherGroup` 根据 YAM
 迁移脚本会校验全部旧记录、在事务中写入数据库，并将原文件重命名为 `.migrated` 备份。
 ## 后续计划
 
-- 增加 ARM 交叉编译
+- 在真实 ARM64 开发板上执行串口、MQTT 和 TCP 长时间稳定性测试
+- 增加发布版本签名与自动化 Release 流程

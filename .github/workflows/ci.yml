@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-tests:
+    name: Ubuntu native tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libmosquitto-dev \
+            libsqlite3-dev \
+            libyaml-cpp-dev \
+            mosquitto \
+            mosquitto-clients \
+            openssl \
+            pkg-config \
+            python3 \
+            python3-serial \
+            socat \
+            sqlite3
+
+      - name: Start Mosquitto
+        run: sudo service mosquitto start
+
+      - name: Run native test suite
+        run: ./scripts/run_smoke_test.sh
+
+  aarch64-cross-build:
+    name: ARM64 cross build
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install cross-build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            file \
+            g++-aarch64-linux-gnu \
+            pkg-config \
+            qemu-user
+
+      - name: Prepare ARM64 dependency sysroot
+        env:
+          AARCH64_TOOLS_ROOT: ${{ runner.temp }}/aarch64-tools
+        run: ./scripts/setup_aarch64_sysroot.sh
+
+      - name: Build and verify ARM64 artifact
+        env:
+          AARCH64_TOOLS_ROOT: ${{ runner.temp }}/aarch64-tools
+          AARCH64_BUILD_DIR: ${{ runner.temp }}/aarch64-build
+        run: ./scripts/build_aarch64.sh
+
+      - name: Upload ARM64 deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-iot-edge-gateway-aarch64
+          path: ${{ runner.temp }}/aarch64-tools/artifacts/linux-iot-edge-gateway-aarch64.tar.gz
+          if-no-files-found: error
