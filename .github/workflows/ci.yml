@@ -13,6 +13,8 @@ jobs:
   native-tests:
     name: Ubuntu native tests
     runs-on: ubuntu-22.04
+    env:
+      BUILD_DIR: ${{ runner.temp }}/native-build
 
     steps:
       - name: Check out source
@@ -38,23 +40,47 @@ jobs:
             sqlite3
 
       - name: Start Mosquitto
-        run: sudo service mosquitto start
+        shell: bash
+        run: |
+          sudo service mosquitto start
+          for attempt in {1..30}; do
+            if ss -lnt | grep -q ':1883'; then
+              exit 0
+            fi
+            sleep 0.2
+          done
+          echo "Mosquitto did not begin listening on port 1883"
+          exit 1
 
-      - name: Run native test suite
+      - name: Configure and build native targets
         shell: bash
         run: |
           set -o pipefail
-          ./scripts/run_smoke_test.sh 2>&1 | tee native-test.log
-          status=${PIPESTATUS[0]}
-          if (( status != 0 )); then
-            {
-              echo "## Native test failure"
-              echo '```text'
-              tail -n 120 native-test.log
-              echo '```'
-            } >> "${GITHUB_STEP_SUMMARY}"
-            exit "${status}"
-          fi
+          cmake -S . -B "${BUILD_DIR}" 2>&1 | tee native-test.log
+          cmake --build "${BUILD_DIR}" --parallel 2>&1 | tee -a native-test.log
+
+      - name: Run CTest suite
+        run: |
+          ctest --test-dir "${BUILD_DIR}" --output-on-failure \
+            2>&1 | tee -a native-test.log
+
+      - name: Run MQTT authentication and TLS smoke test
+        run: ./scripts/run_mqtt_security_smoke_test.sh 2>&1 | tee -a native-test.log
+
+      - name: Run graceful shutdown smoke test
+        run: ./scripts/run_shutdown_smoke_test.sh 2>&1 | tee -a native-test.log
+
+      - name: Run cache migration smoke test
+        run: ./scripts/run_cache_migration_test.sh 2>&1 | tee -a native-test.log
+
+      - name: Run serial-to-MQTT smoke test
+        run: ./scripts/run_serial_smoke_test.sh 2>&1 | tee -a native-test.log
+
+      - name: Run multi-serial MQTT smoke test
+        run: ./scripts/run_multi_serial_smoke_test.sh 2>&1 | tee -a native-test.log
+
+      - name: Run TCP smoke test
+        run: ./scripts/run_tcp_smoke_test.sh 2>&1 | tee -a native-test.log
 
       - name: Upload native test log
         if: always()
