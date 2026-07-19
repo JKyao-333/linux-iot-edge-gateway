@@ -3,6 +3,8 @@
 #include "publisher/publisher.h"
 #include "tcp/tcp_client.h"
 
+#include <mutex>
+
 namespace publishing {
 
 class TcpPublisher final : public Publisher {
@@ -18,6 +20,7 @@ public:
 
 private:
     tcp::TcpClient& tcp_client_;
+    std::mutex mutex_;
 };
 
 }  // namespace publishing

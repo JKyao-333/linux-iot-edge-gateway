@@ -6,6 +6,7 @@
 
 #include <string>
 #include <string_view>
+#include <mutex>
 
 namespace mqtt {
 
@@ -29,6 +30,7 @@ public:
 private:
     MqttClient& mqtt_client_;
     cache::MessageCache& message_cache_;
+    std::mutex mutex_;
 };
 
 const char* to_string(PublishResult result);

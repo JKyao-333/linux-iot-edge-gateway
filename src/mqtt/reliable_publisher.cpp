@@ -1,4 +1,5 @@
 #include "mqtt/reliable_publisher.h"
+#include <mutex>
 #include <vector>
 #include <iostream>
 
@@ -13,6 +14,8 @@ ReliablePublisher::ReliablePublisher(
 PublishResult ReliablePublisher::publish(
     const std::string& topic,
     const std::string& payload) {
+
+    std::lock_guard<std::mutex> lock(mutex_);
 
     if (mqtt_client_.publish(topic, payload)) {
         return PublishResult::Published;
@@ -36,6 +39,8 @@ std::string_view ReliablePublisher::channel() const noexcept {
 }
 
 std::size_t ReliablePublisher::flush_cache() {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     const auto messages = message_cache_.load_all();
 
     if (messages.empty()) {

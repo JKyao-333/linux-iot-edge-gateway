@@ -20,11 +20,16 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <termios.h>
+#include <thread>
 #include <unistd.h>
+#include <vector>
 
 namespace {
+
+std::mutex console_mutex;
 
 bool configure_serial(int fd, speed_t baud_rate) {
     termios tty{};
@@ -133,6 +138,8 @@ void print_raw_bytes(
     const unsigned char* buffer,
     ssize_t length) {
 
+    std::lock_guard<std::mutex> lock(console_mutex);
+
     std::cout << "RX " << length << " bytes: ";
 
     for (ssize_t index = 0; index < length; ++index) {
@@ -150,6 +157,8 @@ void print_raw_bytes(
 }
 
 void print_frame(const protocol::Frame& frame) {
+    std::lock_guard<std::mutex> lock(console_mutex);
+
     std::cout
         << "Parsed frame: cmd=0x"
         << std::uppercase
@@ -262,18 +271,20 @@ logging::Level parse_log_level(
     return logging::Level::Debug;
 }
 
-int run_gateway(
-    const config::GatewayConfig& gateway_config,
+void run_serial_worker(
+    const config::SerialConfig& serial_config,
     const std::string& device,
+    const std::string& mqtt_topic_prefix,
+    publishing::PublisherGroup& publishers,
     logging::Logger& logger) {
 
     const speed_t serial_baud_rate =
         to_termios_baud_rate(
-            gateway_config.serial.baud_rate
+            serial_config.baud_rate
         );
 
     const int serial_reconnect_seconds =
-        gateway_config.serial.reconnect_interval_seconds;
+        serial_config.reconnect_interval_seconds;
 
     const auto serial_reconnect_interval =
         std::chrono::seconds(
@@ -286,6 +297,11 @@ int run_gateway(
         + " seconds";
 
     int fd = -1;
+
+    logger.info(
+        "serial",
+        "worker starting: " + device
+    );
 
     while (fd < 0 && !app::shutdown_requested()) {
         fd = open_serial_device(
@@ -308,7 +324,7 @@ int run_gateway(
 
     if (app::shutdown_requested()) {
         close_serial_device(fd);
-        return 0;
+        return;
     }
 
     logger.info(
@@ -317,81 +333,6 @@ int run_gateway(
     );
 
     protocol::FrameParser parser;
-    mqtt::MqttClient mqtt_client(
-        gateway_config.mqtt.host,
-        gateway_config.mqtt.port
-    );
-
-    std::unique_ptr<cache::MessageCache> message_cache;
-
-    if (gateway_config.cache.type == "sqlite") {
-        auto sqlite_cache =
-            std::make_unique<cache::SqliteCache>(
-                gateway_config.cache.path
-            );
-
-        if (!sqlite_cache->is_ready()) {
-            logger.error(
-                "cache",
-                sqlite_cache->error_message()
-            );
-            close_serial_device(fd);
-            return 1;
-        }
-
-        message_cache = std::move(sqlite_cache);
-    } else {
-        message_cache =
-            std::make_unique<cache::FileCache>(
-                gateway_config.cache.path
-            );
-    }
-
-    logger.info(
-        "cache",
-        "backend=" + gateway_config.cache.type
-            + ", path=" + gateway_config.cache.path
-    );
-
-    mqtt::ReliablePublisher mqtt_publisher(
-        mqtt_client,
-        *message_cache
-    );
-    tcp::TcpClient tcp_client(
-        gateway_config.tcp.host,
-        gateway_config.tcp.port
-    );
-    publishing::TcpPublisher tcp_publisher(tcp_client);
-    publishing::PublisherGroup publishers;
-
-    publishers.add(mqtt_publisher);
-
-    if (gateway_config.tcp.enabled) {
-        publishers.add(tcp_publisher);
-    }
-
-    logger.info(
-        "publisher",
-        "enabled channels="
-            + std::to_string(publishers.size())
-    );
-
-    logger.info(
-        "cache",
-        "checking cached mqtt messages"
-    );
-
-    mqtt_publisher.flush_cache();
-
-    const auto cache_retry_interval =
-        std::chrono::seconds(
-            gateway_config.mqtt
-                .cache_retry_interval_seconds
-        );
-
-    auto last_cache_retry =
-        std::chrono::steady_clock::now();
-
     unsigned char buffer[256];
 
     while (!app::shutdown_requested()) {
@@ -451,16 +392,6 @@ int run_gateway(
             continue;
         }
 
-        const auto now =
-            std::chrono::steady_clock::now();
-
-        if (now - last_cache_retry
-            >= cache_retry_interval) {
-
-            mqtt_publisher.flush_cache();
-            last_cache_retry = now;
-        }
-
         if (received == 0) {
             continue;
         }
@@ -497,7 +428,7 @@ int run_gateway(
         for (const auto& frame : frames) {
             handle_frame(
                 frame,
-                gateway_config.mqtt.topic_prefix,
+                mqtt_topic_prefix,
                 publishers,
                 logger
             );
@@ -505,6 +436,131 @@ int run_gateway(
     }
 
     close_serial_device(fd);
+
+    logger.info(
+        "serial",
+        "worker stopped: " + device
+    );
+}
+
+int run_gateway(
+    const config::GatewayConfig& gateway_config,
+    const std::vector<std::string>& devices,
+    logging::Logger& logger) {
+
+    mqtt::MqttClient mqtt_client(
+        gateway_config.mqtt.host,
+        gateway_config.mqtt.port
+    );
+
+    std::unique_ptr<cache::MessageCache> message_cache;
+
+    if (gateway_config.cache.type == "sqlite") {
+        auto sqlite_cache =
+            std::make_unique<cache::SqliteCache>(
+                gateway_config.cache.path
+            );
+
+        if (!sqlite_cache->is_ready()) {
+            logger.error(
+                "cache",
+                sqlite_cache->error_message()
+            );
+
+            return 1;
+        }
+
+        message_cache = std::move(sqlite_cache);
+    } else {
+        message_cache =
+            std::make_unique<cache::FileCache>(
+                gateway_config.cache.path
+            );
+    }
+
+    logger.info(
+        "cache",
+        "backend=" + gateway_config.cache.type
+            + ", path=" + gateway_config.cache.path
+    );
+
+    mqtt::ReliablePublisher mqtt_publisher(
+        mqtt_client,
+        *message_cache
+    );
+
+    tcp::TcpClient tcp_client(
+        gateway_config.tcp.host,
+        gateway_config.tcp.port
+    );
+
+    publishing::TcpPublisher tcp_publisher(tcp_client);
+    publishing::PublisherGroup publishers;
+
+    publishers.add(mqtt_publisher);
+
+    if (gateway_config.tcp.enabled) {
+        publishers.add(tcp_publisher);
+    }
+
+    logger.info(
+        "publisher",
+        "enabled channels="
+            + std::to_string(publishers.size())
+    );
+
+    logger.info(
+        "cache",
+        "checking cached mqtt messages"
+    );
+
+    mqtt_publisher.flush_cache();
+
+    std::vector<std::thread> serial_workers;
+    serial_workers.reserve(devices.size());
+
+    for (const auto& device : devices) {
+        serial_workers.emplace_back(
+            [&gateway_config,
+             &publishers,
+             &logger,
+             device]() {
+
+                run_serial_worker(
+                    gateway_config.serial,
+                    device,
+                    gateway_config.mqtt.topic_prefix,
+                    publishers,
+                    logger
+                );
+            }
+        );
+    }
+
+    logger.info(
+        "serial",
+        "worker count="
+            + std::to_string(serial_workers.size())
+    );
+
+    const auto cache_retry_interval =
+        std::chrono::seconds(
+            gateway_config.mqtt
+                .cache_retry_interval_seconds
+        );
+
+    while (!app::wait_for_shutdown(
+        cache_retry_interval)) {
+
+        mqtt_publisher.flush_cache();
+    }
+
+    for (auto& worker : serial_workers) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
+
     tcp_client.disconnect();
     return 0;
 }
@@ -554,14 +610,14 @@ int main(int argc, char* argv[]) {
         "edge gateway starting"
     );
 
-    const std::string device =
+    const std::vector<std::string> devices =
         argc >= 3
-            ? argv[2]
-            : gateway_config.serial.device;
+            ? std::vector<std::string>{argv[2]}
+            : gateway_config.serial.devices;
 
     const int result = run_gateway(
         gateway_config,
-        device,
+        devices,
         logger
     );
 

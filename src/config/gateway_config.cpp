@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <set>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -87,11 +89,22 @@ bool load_gateway_config(
         const YAML::Node serial = root["serial"];
 
         if (serial) {
-            load_if_present(
-                serial,
-                "device",
-                gateway_config.serial.device
-            );
+            if (serial["devices"]) {
+                if (!serial["devices"].IsSequence()) {
+                    error_message =
+                        "serial.devices must be a YAML sequence";
+
+                    return false;
+                }
+
+                gateway_config.serial.devices =
+                    serial["devices"]
+                        .as<std::vector<std::string>>();
+            } else if (serial["device"]) {
+                gateway_config.serial.devices = {
+                    serial["device"].as<std::string>()
+                };
+            }
 
             load_if_present(
                 serial,
@@ -222,11 +235,31 @@ bool load_gateway_config(
                 uppercase(gateway_config.log.level);
         }
 
-        if (gateway_config.serial.device.empty()) {
+        if (gateway_config.serial.devices.empty()) {
             error_message =
-                "serial.device must not be empty";
+                "serial.devices must not be empty";
 
             return false;
+        }
+
+        std::set<std::string> unique_serial_devices;
+
+        for (const auto& device
+             : gateway_config.serial.devices) {
+
+            if (device.empty()) {
+                error_message =
+                    "serial device path must not be empty";
+
+                return false;
+            }
+
+            if (!unique_serial_devices.insert(device).second) {
+                error_message =
+                    "serial.devices must not contain duplicates";
+
+                return false;
+            }
         }
 
         if (!is_supported_baud_rate(

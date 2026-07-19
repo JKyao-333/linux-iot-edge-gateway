@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(yaml-cpp REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED)
 
 pkg_check_modules(
     MOSQUITTO
@@ -183,6 +184,7 @@ target_link_libraries(edge_gateway
         publisher_group
         file_cache
         sqlite_cache
+        Threads::Threads
 )
 add_executable(mqtt_client_test
     tests/mqtt_client_test.cpp

@@ -1,5 +1,7 @@
 #include "publisher/tcp_publisher.h"
 
+#include <mutex>
+
 namespace publishing {
 
 TcpPublisher::TcpPublisher(tcp::TcpClient& tcp_client)
@@ -14,6 +16,7 @@ PublishStatus TcpPublisher::publish(
     const std::string& payload) {
 
     static_cast<void>(topic);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     return tcp_client_.send_json(payload)
         ? PublishStatus::Published

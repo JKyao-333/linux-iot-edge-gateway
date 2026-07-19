@@ -28,8 +28,8 @@ int main(int argc, char* argv[]) {
     std::cout << std::boolalpha;
 
     std::cout
-        << "serial.device: "
-        << gateway_config.serial.device
+        << "serial.devices: "
+        << gateway_config.serial.devices.size()
         << std::endl;
 
     std::cout
@@ -83,7 +83,8 @@ int main(int argc, char* argv[]) {
         << std::endl;
 
     const bool values_are_correct =
-        gateway_config.serial.device
+        gateway_config.serial.devices.size() == 1
+        && gateway_config.serial.devices[0]
             == "/tmp/tty_gateway"
         && gateway_config.serial.baud_rate
             == 115200

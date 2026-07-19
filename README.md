@@ -5,6 +5,7 @@
 ## 核心能力
 
 - termios 串口配置与原始字节接收
+- 多串口独立工作线程与多设备并发接入
 - 自定义二进制协议解析
 - CRC16-Modbus 校验
 - 半包、粘包和异常帧处理
@@ -126,7 +127,7 @@ Ubuntu 安装命令：
 
 | 配置项 | 说明 |
 |---|---|
-| `serial.device` | 串口设备路径 |
+| `serial.devices` | 串口设备路径列表，每个设备启动一个独立工作线程 |
 | `serial.baud_rate` | 串口波特率 |
 | `serial.reconnect_interval_seconds` | 串口断线重连间隔 |
 | `mqtt.host` | MQTT Broker 地址 |
@@ -152,6 +153,8 @@ Ubuntu 安装命令：
 临时覆盖串口设备：
 
 `~/linux-iot-edge-gateway-build/edge_gateway config/gateway.yaml /tmp/tty_gateway`
+
+配置文件可在 `serial.devices` 中声明多个串口。命令行提供串口设备覆盖值时，仅启动该指定设备，便于单串口调试和 systemd 部署。
 
 配置文件包含类型检查和范围检查。端口、波特率、重连周期或日志级别无效时，程序将输出错误并拒绝启动。
 ## 编译
@@ -191,8 +194,9 @@ Ubuntu 安装命令：
 7. Python 半包发送
 8. 串口协议解析与 JSON 生成
 9. MQTT 发布验证
-10. SQLite 缓存迁移验证
-11. 原生 TCP 发布验证
+10. 双虚拟串口并发接入与不同设备 Topic 验证
+11. SQLite 缓存迁移验证
+12. 原生 TCP 发布验证
 成功时最终输出：
 
 `[PASS] all smoke tests passed`
@@ -249,6 +253,8 @@ Ubuntu 安装命令：
 - 串口不存在时每 2 秒重试
 - 运行中断线后自动重新连接
 - 重连时清除断线前残留半帧
+- 每个串口使用独立线程、文件描述符和 `FrameParser`，单路断线不会阻塞其他串口
+- MQTT 缓存发布和 TCP 发送使用互斥保护，允许多个串口线程安全共享上报通道
 
 ### 进程生命周期
 
@@ -277,6 +283,7 @@ Ubuntu 安装命令：
 - 数据解析、清洗和 JSON 测试通过
 - MQTT 发布、离线缓存和补传测试通过
 - 串口到 MQTT 端到端 smoke test 通过
+- 双串口并发接入与多设备 MQTT Topic smoke test 通过
 - C++ TCP 客户端与 Python TCP 服务端 smoke test 通过
 - 串口数据同时上报 MQTT 与 TCP 的手工联调通过
 - 串口断开与恢复测试通过
@@ -305,6 +312,5 @@ MQTT 与 TCP 均实现统一的 `Publisher` 接口。`PublisherGroup` 根据 YAM
 迁移脚本会校验全部旧记录、在事务中写入数据库，并将原文件重命名为 `.migrated` 备份。
 ## 后续计划
 
-- 增加多串口和多设备并发
 - 增加 MQTT 用户认证和 TLS 加密
 - 增加 ARM 交叉编译

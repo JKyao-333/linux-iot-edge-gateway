@@ -150,6 +150,58 @@ int main() {
         return 1;
     }
 
+    if (!write_file(
+            test_path,
+            "serial:\n"
+            "  devices:\n"
+            "    - /tmp/tty_gateway\n"
+            "    - /tmp/tty_gateway\n")) {
+
+        std::cerr
+            << "failed to write duplicate serial devices"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(
+            test_path,
+            "duplicates")) {
+
+        std::cerr
+            << "duplicate serial devices were not rejected"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "serial:\n"
+            "  devices: []\n")) {
+
+        std::cerr
+            << "failed to write empty serial device list"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(
+            test_path,
+            "must not be empty")) {
+
+        std::cerr
+            << "empty serial device list was not rejected"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
     std::remove(test_path.c_str());
 
     std::cout

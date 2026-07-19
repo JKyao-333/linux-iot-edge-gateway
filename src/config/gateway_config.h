@@ -2,11 +2,14 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace config {
 
 struct SerialConfig {
-    std::string device = "/tmp/tty_gateway";
+    std::vector<std::string> devices = {
+        "/tmp/tty_gateway"
+    };
     int baud_rate = 115200;
     int reconnect_interval_seconds = 2;
 };
