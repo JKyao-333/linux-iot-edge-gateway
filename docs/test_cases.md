@@ -23,7 +23,7 @@
 
 仅运行 CTest：`ctest --test-dir ~/linux-iot-edge-gateway-build --output-on-failure`
 
-通过标准：26 个 CTest、单串口与双串口 MQTT 端到端测试、MQTT 认证与 TLS smoke test、TCP smoke test 和缓存迁移测试全部通过。
+通过标准：28 个 CTest、单串口与双串口 MQTT 端到端测试、MQTT 认证与 TLS smoke test、TCP smoke test 和缓存迁移测试全部通过。
 
 ARM64 构建验证：`./scripts/build_aarch64.sh`
 ## 4. C++ 测试矩阵
@@ -56,6 +56,8 @@ ARM64 构建验证：`./scripts/build_aarch64.sh`
 | TC-024 | publisher_group_test | 多通道扇出、逐通道结果和失败隔离 |
 | TC-025 | byte_ring_buffer_test | 固定容量、回绕顺序、满缓冲拒绝与消费 |
 | TC-026 | frame_parser_ring_buffer_test | 噪声过滤、半包保留、粘包解析与无溢出验证 |
+| TC-027 | release_version_test | `VERSION` 语义化格式及标签一致性 |
+| TC-028 | version_cli_test | 网关 `--version` 输出与构建版本一致 |
 ## 5. 端到端与故障测试
 
 | 编号 | 测试场景 | 预期结果 |
@@ -93,7 +95,7 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 
 ## 7. 阶段验收标准
 
-- 26 个 CTest 全部通过。
+- 28 个 CTest 全部通过。
 - 串口到 MQTT smoke test 通过。
 - 双串口并发接入 smoke test 通过，且两路数据均能独立上报。
 - 半包、粘包和异常帧处理正确。
@@ -281,4 +283,8 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 
 ### ARM-04：部署包检查
 
-预期生成 `linux-iot-edge-gateway-aarch64.tar.gz`，包内包含网关程序、生产 YAML 配置和 systemd 服务单元。
+预期生成 `linux-iot-edge-gateway-<version>-aarch64.tar.gz` 和对应 `.sha256` 文件，包内包含网关程序、版本文件、生产 YAML 配置和 systemd 服务单元。
+
+### ARM-05：版本与校验文件
+
+执行 `./scripts/build_aarch64.sh` 后，部署包文件名必须包含 `VERSION` 中的版本号。执行 `sha256sum -c` 应返回成功，包内的 `/usr/local/share/linux-iot-edge-gateway/VERSION` 应与程序 `--version` 输出一致。

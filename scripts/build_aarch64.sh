@@ -13,13 +13,17 @@ SYSROOT="${AARCH64_SYSROOT:-${TOOLS_ROOT}/aarch64-sysroot}"
 BUILD_DIR="${AARCH64_BUILD_DIR:-${HOME}/linux-iot-edge-gateway-build-aarch64}"
 OUTPUT_DIR="${AARCH64_OUTPUT_DIR:-${TOOLS_ROOT}/artifacts}"
 STAGE_DIR="${BUILD_DIR}/stage"
-ARTIFACT_PATH="${OUTPUT_DIR}/linux-iot-edge-gateway-aarch64.tar.gz"
+VERSION="$("${PROJECT_DIR}/scripts/verify_release_version.sh")"
+ARTIFACT_NAME="linux-iot-edge-gateway-${VERSION}-aarch64.tar.gz"
+ARTIFACT_PATH="${OUTPUT_DIR}/${ARTIFACT_NAME}"
+CHECKSUM_PATH="${ARTIFACT_PATH}.sha256"
 
 for command_name in \
     aarch64-linux-gnu-g++ \
     cmake \
     file \
     readelf \
+    sha256sum \
     tar; do
 
     if ! command -v "${command_name}" >/dev/null 2>&1; then
@@ -67,6 +71,22 @@ fi
 if command -v qemu-aarch64 >/dev/null 2>&1; then
     QEMU_LOG="${BUILD_DIR}/qemu-startup.log"
 
+    QEMU_VERSION="$(
+        qemu-aarch64 \
+            -L /usr/aarch64-linux-gnu \
+            -E "LD_LIBRARY_PATH=${SYSROOT}/usr/lib/aarch64-linux-gnu" \
+            "${BINARY_PATH}" \
+            --version
+    )"
+
+    if [[ "${QEMU_VERSION}" != "linux-iot-edge-gateway ${VERSION}" ]]; then
+        echo "[ERROR] ARM64 version output does not match VERSION"
+        echo "[INFO] actual: ${QEMU_VERSION}"
+        exit 1
+    fi
+
+    echo "[PASS] ARM64 version: ${QEMU_VERSION}"
+
     set +e
     qemu-aarch64 \
         -L /usr/aarch64-linux-gnu \
@@ -93,6 +113,7 @@ fi
 rm -rf -- "${STAGE_DIR}"
 mkdir -p \
     "${STAGE_DIR}/usr/local/bin" \
+    "${STAGE_DIR}/usr/local/share/linux-iot-edge-gateway" \
     "${STAGE_DIR}/etc/linux-iot-edge-gateway" \
     "${STAGE_DIR}/lib/systemd/system" \
     "${OUTPUT_DIR}"
@@ -100,6 +121,10 @@ mkdir -p \
 install -m 0755 \
     "${BINARY_PATH}" \
     "${STAGE_DIR}/usr/local/bin/edge_gateway"
+
+install -m 0644 \
+    "${PROJECT_DIR}/VERSION" \
+    "${STAGE_DIR}/usr/local/share/linux-iot-edge-gateway/VERSION"
 
 install -m 0640 \
     "${PROJECT_DIR}/config/gateway.systemd.yaml" \
@@ -114,9 +139,16 @@ tar \
     -czf "${ARTIFACT_PATH}" \
     .
 
+(
+    cd "${OUTPUT_DIR}"
+    sha256sum "${ARTIFACT_NAME}" \
+        > "$(basename "${CHECKSUM_PATH}")"
+)
+
 echo "[INFO] ARM64 dynamic dependencies"
 readelf -d "${BINARY_PATH}" \
     | grep 'Shared library' || true
 
 echo "[PASS] ARM64 ELF: $(file "${BINARY_PATH}")"
 echo "[PASS] deployment artifact: ${ARTIFACT_PATH}"
+echo "[PASS] SHA-256 checksum: ${CHECKSUM_PATH}"

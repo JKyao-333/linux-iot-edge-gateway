@@ -1,6 +1,29 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(linux_iot_edge_gateway LANGUAGES CXX)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION"
+    GATEWAY_VERSION
+    LIMIT_COUNT 1
+)
+string(STRIP "${GATEWAY_VERSION}" GATEWAY_VERSION)
+
+if(NOT GATEWAY_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR
+        "VERSION must use MAJOR.MINOR.PATCH: ${GATEWAY_VERSION}"
+    )
+endif()
+
+project(
+    linux_iot_edge_gateway
+    VERSION "${GATEWAY_VERSION}"
+    LANGUAGES CXX
+)
+
+configure_file(
+    src/version.h.in
+    generated/version.h
+    @ONLY
+)
+
 enable_testing()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -169,6 +192,11 @@ target_include_directories(logger
 )
 add_executable(edge_gateway
     src/main.cpp
+)
+
+target_include_directories(edge_gateway
+    PRIVATE
+        "${CMAKE_CURRENT_BINARY_DIR}/generated"
 )
 
 target_link_libraries(edge_gateway
@@ -528,6 +556,27 @@ register_gateway_test(
     frame_parser_ring_buffer_test
     tests/frame_parser_ring_buffer_test.cpp
     protocol
+)
+
+add_test(
+    NAME release_version_test
+    COMMAND bash
+        "${CMAKE_SOURCE_DIR}/scripts/verify_release_version.sh"
+        "v${PROJECT_VERSION}"
+)
+
+add_test(
+    NAME version_cli_test
+    COMMAND $<TARGET_FILE:edge_gateway> --version
+)
+
+set_tests_properties(
+    release_version_test
+    version_cli_test
+    PROPERTIES
+        LABELS "release"
+        PASS_REGULAR_EXPRESSION "${PROJECT_VERSION}"
+        TIMEOUT 5
 )
 
 set_tests_properties(

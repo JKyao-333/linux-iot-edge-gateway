@@ -75,5 +75,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-iot-edge-gateway-aarch64
-          path: ${{ runner.temp }}/aarch64-tools/artifacts/linux-iot-edge-gateway-aarch64.tar.gz
+          path: |
+            ${{ runner.temp }}/aarch64-tools/artifacts/linux-iot-edge-gateway-*-aarch64.tar.gz
+            ${{ runner.temp }}/aarch64-tools/artifacts/linux-iot-edge-gateway-*-aarch64.tar.gz.sha256
           if-no-files-found: error

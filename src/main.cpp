@@ -11,6 +11,7 @@
 #include "publisher/publisher_group.h"
 #include "publisher/tcp_publisher.h"
 #include "tcp/tcp_client.h"
+#include "version.h"
 
 #include <cerrno>
 #include <chrono>
@@ -594,6 +595,15 @@ int run_gateway(
 }  // namespace
 
 int main(int argc, char* argv[]) {
+    if (argc == 2 && std::string(argv[1]) == "--version") {
+        std::cout
+            << "linux-iot-edge-gateway "
+            << app::kVersion
+            << std::endl;
+
+        return 0;
+    }
+
     const std::string config_path =
         argc >= 2
             ? argv[1]
@@ -633,7 +643,8 @@ int main(int argc, char* argv[]) {
 
     logger.info(
         "app",
-        "edge gateway starting"
+        "edge gateway starting, version="
+            + std::string(app::kVersion)
     );
 
     const std::vector<std::string> devices =

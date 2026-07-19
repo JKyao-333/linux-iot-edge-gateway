@@ -264,6 +264,8 @@ ARM64 版本通过 GNU AArch64 交叉编译器构建。构建脚本从 Ubuntu Po
 3. `qemu-aarch64` 启动程序并验证配置错误退出路径。
 
 验证通过后，将程序、生产配置和 systemd 服务单元打包为可部署的 `tar.gz`。
+
+项目根目录的 `VERSION` 是唯一版本源。CMake 将版本写入程序，ARM64 构建脚本生成带版本号的部署包和 SHA-256 校验文件。推送与版本一致的 `vMAJOR.MINOR.PATCH` 标签后，GitHub Actions 会创建 Release，并为部署包生成构建来源证明。
 ## 8. 原生 TCP 上报
 
 ### 8.1 模块文件

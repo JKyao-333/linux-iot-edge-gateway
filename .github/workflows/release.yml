@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release-aarch64:
+    name: Build and release ARM64 package
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Verify tag and project version
+        run: ./scripts/verify_release_version.sh "${GITHUB_REF_NAME}"
+
+      - name: Install cross-build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            file \
+            g++-aarch64-linux-gnu \
+            pkg-config \
+            qemu-user
+
+      - name: Prepare ARM64 dependency sysroot
+        env:
+          AARCH64_TOOLS_ROOT: ${{ runner.temp }}/aarch64-tools
+        run: ./scripts/setup_aarch64_sysroot.sh
+
+      - name: Build versioned ARM64 package
+        env:
+          AARCH64_TOOLS_ROOT: ${{ runner.temp }}/aarch64-tools
+          AARCH64_BUILD_DIR: ${{ runner.temp }}/aarch64-build
+          AARCH64_OUTPUT_DIR: ${{ runner.temp }}/release
+        run: ./scripts/build_aarch64.sh
+
+      - name: Locate release files
+        id: release-files
+        shell: bash
+        run: |
+          version="$(./scripts/verify_release_version.sh)"
+          artifact="${RUNNER_TEMP}/release/linux-iot-edge-gateway-${version}-aarch64.tar.gz"
+          checksum="${artifact}.sha256"
+          test -f "${artifact}"
+          test -f "${checksum}"
+          echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
+          echo "checksum=${checksum}" >> "${GITHUB_OUTPUT}"
+
+      - name: Attest ARM64 package provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.release-files.outputs.artifact }}
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ steps.release-files.outputs.artifact }}
+          CHECKSUM: ${{ steps.release-files.outputs.checksum }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "${ARTIFACT}" \
+            "${CHECKSUM}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Linux IoT Edge Gateway ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag

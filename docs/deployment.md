@@ -127,7 +127,11 @@
 
 默认部署包位于：
 
-`/mnt/d/Tools/linux-iot-edge-gateway/artifacts/linux-iot-edge-gateway-aarch64.tar.gz`
+`/mnt/d/Tools/linux-iot-edge-gateway/artifacts/linux-iot-edge-gateway-<version>-aarch64.tar.gz`
+
+对应的 SHA-256 校验文件位于：
+
+`/mnt/d/Tools/linux-iot-edge-gateway/artifacts/linux-iot-edge-gateway-<version>-aarch64.tar.gz.sha256`
 
 将部署包传到 ARM64 Ubuntu 22.04 设备后，先安装运行时依赖：
 
@@ -135,8 +139,10 @@
 
 检查包内容后解压到根目录：
 
-`tar -tzf linux-iot-edge-gateway-aarch64.tar.gz`
+`sha256sum -c linux-iot-edge-gateway-<version>-aarch64.tar.gz.sha256`
 
-`sudo tar -xzf linux-iot-edge-gateway-aarch64.tar.gz -C /`
+`tar -tzf linux-iot-edge-gateway-<version>-aarch64.tar.gz`
+
+`sudo tar -xzf linux-iot-edge-gateway-<version>-aarch64.tar.gz -C /`
 
 随后按照本指南创建运行用户、数据目录和日志目录，再启用服务。首次部署应先执行 `file /usr/local/bin/edge_gateway`，确认输出包含 `ARM aarch64`。
