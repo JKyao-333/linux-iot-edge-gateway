@@ -142,6 +142,22 @@ target_link_libraries(reliable_publisher
         mqtt_client
         message_cache
 )
+
+add_library(publisher_group
+    src/publisher/publisher_group.cpp
+    src/publisher/tcp_publisher.cpp
+)
+
+target_include_directories(publisher_group
+    PUBLIC
+        src
+)
+
+target_link_libraries(publisher_group
+    PUBLIC
+        tcp_client
+)
+
 add_library(logger
     src/log/logger.cpp
 )
@@ -164,6 +180,7 @@ target_link_libraries(edge_gateway
         mqtt_client
         logger
         reliable_publisher
+        publisher_group
         file_cache
         sqlite_cache
 )
@@ -429,6 +446,12 @@ register_gateway_test(
     reliable_publisher_test
     tests/reliable_publisher_test.cpp
     reliable_publisher
+)
+
+register_gateway_test(
+    publisher_group_test
+    tests/publisher_group_test.cpp
+    publisher_group
 )
 
 register_gateway_test(

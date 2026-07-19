@@ -21,7 +21,7 @@
 
 仅运行 CTest：`ctest --test-dir ~/linux-iot-edge-gateway-build --output-on-failure`
 
-通过标准：23 个 CTest、串口到 MQTT 端到端测试、TCP smoke test 和缓存迁移测试全部通过。
+通过标准：24 个 CTest、串口到 MQTT 端到端测试、TCP smoke test 和缓存迁移测试全部通过。
 ## 4. C++ 测试矩阵
 
 | 编号 | 测试目标 | 验证内容 |
@@ -49,6 +49,7 @@
 | TC-021 | shutdown_signal_test | SIGINT/SIGTERM 退出标志 |
 | TC-022 | sqlite_cache_test | SQLite FIFO 追加、读取与队首删除 |
 | TC-023 | sqlite_cache_persistence_test | 进程重启后的缓存持久化与顺序 |
+| TC-024 | publisher_group_test | 多通道扇出、逐通道结果和失败隔离 |
 ## 5. 端到端与故障测试
 
 | 编号 | 测试场景 | 预期结果 |
@@ -79,7 +80,7 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 
 ## 7. 阶段验收标准
 
-- 23 个 CTest 全部通过。
+- 24 个 CTest 全部通过。
 - 串口到 MQTT smoke test 通过。
 - 半包、粘包和异常帧处理正确。
 - 串口断开后能够自动重连。

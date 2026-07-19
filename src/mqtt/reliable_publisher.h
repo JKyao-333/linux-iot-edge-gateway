@@ -2,18 +2,16 @@
 #include <cstddef>
 #include "cache/message_cache.h"
 #include "mqtt/mqtt_client.h"
+#include "publisher/publisher.h"
 
 #include <string>
+#include <string_view>
 
 namespace mqtt {
 
-enum class PublishResult {
-    Published,
-    Cached,
-    Failed
-};
+using PublishResult = publishing::PublishStatus;
 
-class ReliablePublisher {
+class ReliablePublisher final : public publishing::Publisher {
 public:
     ReliablePublisher(
         MqttClient& mqtt_client,
@@ -23,7 +21,10 @@ public:
     PublishResult publish(
         const std::string& topic,
         const std::string& payload
-    );
+    ) override;
+
+    std::string_view channel() const noexcept override;
+
     std::size_t flush_cache();
 private:
     MqttClient& mqtt_client_;

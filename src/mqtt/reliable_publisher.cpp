@@ -22,13 +22,17 @@ PublishResult ReliablePublisher::publish(
         std::cout << "[WARN] mqtt unavailable, message cached"
                   << ", topic=" << topic << std::endl;
 
-        return PublishResult::Cached;
+        return PublishResult::Deferred;
     }
 
     std::cerr << "[ERROR] mqtt publish and local cache both failed"
               << ", topic=" << topic << std::endl;
 
     return PublishResult::Failed;
+}
+
+std::string_view ReliablePublisher::channel() const noexcept {
+    return "mqtt";
 }
 
 std::size_t ReliablePublisher::flush_cache() {
@@ -82,8 +86,8 @@ const char* to_string(PublishResult result) {
         case PublishResult::Published:
             return "published";
 
-        case PublishResult::Cached:
-            return "cached";
+        case PublishResult::Deferred:
+            return "deferred";
 
         case PublishResult::Failed:
             return "failed";

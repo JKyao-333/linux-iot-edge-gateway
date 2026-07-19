@@ -8,6 +8,8 @@
 #include "mqtt/mqtt_client.h"
 #include "mqtt/reliable_publisher.h"
 #include "protocol/frame_parser.h"
+#include "publisher/publisher_group.h"
+#include "publisher/tcp_publisher.h"
 #include "tcp/tcp_client.h"
 
 #include <cerrno>
@@ -190,9 +192,7 @@ std::string build_mqtt_topic(
 void handle_frame(
     const protocol::Frame& frame,
     const std::string& mqtt_topic_prefix,
-    bool tcp_enabled,
-    mqtt::ReliablePublisher& publisher,
-    tcp::TcpClient& tcp_client,
+    publishing::PublisherGroup& publishers,
     logging::Logger& logger) {
 
     print_frame(frame);
@@ -222,13 +222,25 @@ void handle_frame(
         sensor_data
     );
 
-    publisher.publish(topic, json);
+    const auto outcomes = publishers.publish(
+        topic,
+        json
+    );
 
-    if (tcp_enabled && !tcp_client.send_json(json)) {
-        logger.warn(
-            "tcp",
-            "TCP publish failed"
-        );
+    for (const auto& outcome : outcomes) {
+        const std::string message =
+            "publish result="
+            + std::string(
+                publishing::to_string(outcome.status)
+            );
+
+        if (outcome.status
+            == publishing::PublishStatus::Failed) {
+
+            logger.warn(outcome.channel, message);
+        } else {
+            logger.debug(outcome.channel, message);
+        }
     }
 }
 
@@ -341,7 +353,7 @@ int run_gateway(
             + ", path=" + gateway_config.cache.path
     );
 
-    mqtt::ReliablePublisher publisher(
+    mqtt::ReliablePublisher mqtt_publisher(
         mqtt_client,
         *message_cache
     );
@@ -349,13 +361,27 @@ int run_gateway(
         gateway_config.tcp.host,
         gateway_config.tcp.port
     );
+    publishing::TcpPublisher tcp_publisher(tcp_client);
+    publishing::PublisherGroup publishers;
+
+    publishers.add(mqtt_publisher);
+
+    if (gateway_config.tcp.enabled) {
+        publishers.add(tcp_publisher);
+    }
+
+    logger.info(
+        "publisher",
+        "enabled channels="
+            + std::to_string(publishers.size())
+    );
 
     logger.info(
         "cache",
         "checking cached mqtt messages"
     );
 
-    publisher.flush_cache();
+    mqtt_publisher.flush_cache();
 
     const auto cache_retry_interval =
         std::chrono::seconds(
@@ -431,7 +457,7 @@ int run_gateway(
         if (now - last_cache_retry
             >= cache_retry_interval) {
 
-            publisher.flush_cache();
+            mqtt_publisher.flush_cache();
             last_cache_retry = now;
         }
 
@@ -472,9 +498,7 @@ int run_gateway(
             handle_frame(
                 frame,
                 gateway_config.mqtt.topic_prefix,
-                gateway_config.tcp.enabled,
-                publisher,
-                tcp_client,
+                publishers,
                 logger
             );
         }

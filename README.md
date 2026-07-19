@@ -33,8 +33,9 @@ STM32 / Python 模拟器
 -> SensorData
 -> 数据清洗
 -> JSON
--> ReliablePublisher
--> MQTT Broker
+-> PublisherGroup
+-> MQTT ReliablePublisher / TCP Publisher
+-> MQTT Broker / TCP Server
 
 发布失败时：
 
@@ -84,6 +85,7 @@ MQTT Topic：
 - `src/app/`：SensorData、数据清洗和 JSON
 - `src/mqtt/`：MQTT 客户端和可靠发布器
 - `src/tcp/`：原生 TCP Socket 客户端
+- `src/publisher/`：统一 Publisher 接口、TCP 适配器和多通道发布组
 - `src/cache/`：SQLite 默认缓存、文件兼容缓存和统一缓存接口
 - `src/log/`：分级日志
 - `deploy/systemd/`：systemd 服务单元
@@ -182,7 +184,7 @@ Ubuntu 安装命令：
 
 1. CMake 配置
 2. C++ 工程编译
-3. 23 个 CTest 测试
+3. 24 个 CTest 测试
 4. YAML 正常配置与异常配置测试
 5. SIGTERM 优雅退出验证
 6. 虚拟串口创建
@@ -270,7 +272,7 @@ Ubuntu 安装命令：
 
 当前自动化测试结果：
 
-- CTest：23/23 通过
+- CTest：24/24 通过
 - CRC、半包、粘包和异常帧测试通过
 - 数据解析、清洗和 JSON 测试通过
 - MQTT 发布、离线缓存和补传测试通过
@@ -294,6 +296,8 @@ Ubuntu 安装命令：
 
 传感器消息采用 QoS 1 发布，网关等待 Broker 返回 PUBACK 后才确认发送成功；连接中断时自动重连，离线消息默认写入 SQLite 持久化队列，连接恢复后按原顺序补传。`MessageCache` 接口隔离业务层与缓存实现，仍可通过 `cache.type: file` 使用兼容文件后端。
 
+MQTT 与 TCP 均实现统一的 `Publisher` 接口。`PublisherGroup` 根据 YAML 配置注册启用通道并依次扇出同一条 JSON；单个通道失败只记录该通道结果，不会阻止其他通道继续发布。MQTT 的离线缓存和补传仍由 `ReliablePublisher` 单独负责。
+
 旧版文件缓存可迁移到 SQLite：
 
 `python3 scripts/migrate_file_cache.py data/pending_messages.cache data/pending_messages.db`
@@ -301,6 +305,6 @@ Ubuntu 安装命令：
 迁移脚本会校验全部旧记录、在事务中写入数据库，并将原文件重命名为 `.migrated` 备份。
 ## 后续计划
 
-- 抽象统一 Publisher 接口
 - 增加多串口和多设备并发
+- 增加 MQTT 用户认证和 TLS 加密
 - 增加 ARM 交叉编译

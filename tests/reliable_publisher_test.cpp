@@ -52,7 +52,7 @@ int main() {
                   << std::endl;
     }
 
-    return result == mqtt::PublishResult::Cached
+    return result == mqtt::PublishResult::Deferred
         && messages.size() == 1
         ? 0
         : 1;
