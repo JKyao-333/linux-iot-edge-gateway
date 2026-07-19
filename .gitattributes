@@ -9,3 +9,4 @@ CMakeLists.txt text eol=lf
 
 *.md text eol=lf
 *.yaml text eol=lf
+*.service text eol=lf

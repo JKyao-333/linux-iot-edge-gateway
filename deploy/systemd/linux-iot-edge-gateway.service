@@ -1,0 +1,31 @@
+[Unit]
+Description=Linux C++ Multi-Protocol IoT Edge Gateway
+Documentation=https://github.com/JKyao-333/linux-iot-edge-gateway
+Wants=network-online.target
+After=network-online.target mosquitto.service
+
+[Service]
+Type=simple
+User=iot-gateway
+Group=iot-gateway
+SupplementaryGroups=dialout
+WorkingDirectory=/var/lib/linux-iot-edge-gateway
+ExecStart=/usr/local/bin/edge_gateway /etc/linux-iot-edge-gateway/gateway.yaml
+Restart=on-failure
+RestartSec=3s
+KillSignal=SIGTERM
+TimeoutStopSec=10s
+UMask=0027
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/linux-iot-edge-gateway /var/log/linux-iot-edge-gateway
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

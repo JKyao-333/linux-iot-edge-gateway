@@ -1,0 +1,24 @@
+# Production-oriented configuration installed by the systemd setup script.
+
+serial:
+  device: /dev/ttyUSB0
+  baud_rate: 115200
+  reconnect_interval_seconds: 2
+
+mqtt:
+  host: localhost
+  port: 1883
+  topic_prefix: sensor
+  cache_retry_interval_seconds: 5
+
+tcp:
+  enabled: false
+  host: 127.0.0.1
+  port: 9000
+
+cache:
+  path: /var/lib/linux-iot-edge-gateway/pending_messages.cache
+
+log:
+  path: /var/log/linux-iot-edge-gateway/gateway.log
+  level: INFO

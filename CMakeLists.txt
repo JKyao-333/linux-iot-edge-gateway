@@ -31,6 +31,16 @@ target_include_directories(app_core
     PUBLIC
         src
 )
+
+add_library(runtime_control
+    src/app/shutdown_signal.cpp
+)
+
+target_include_directories(runtime_control
+    PUBLIC
+        src
+)
+
 add_library(gateway_config
     src/config/gateway_config.cpp
 )
@@ -117,9 +127,10 @@ add_executable(edge_gateway
 target_link_libraries(edge_gateway
     PRIVATE
         protocol
-	tcp_client
+        tcp_client
         app_core
-	gateway_config
+        runtime_control
+        gateway_config
         mqtt_client
         logger
         reliable_publisher
@@ -429,6 +440,20 @@ set_tests_properties(
         LABELS "config"
         TIMEOUT 5
 )
+
+register_gateway_test(
+    shutdown_signal_test
+    tests/shutdown_signal_test.cpp
+    runtime_control
+)
+
+set_tests_properties(
+    shutdown_signal_test
+    PROPERTIES
+        LABELS "runtime"
+        TIMEOUT 5
+)
+
 set_tests_properties(
     mqtt_client_test
     cache_replay_test

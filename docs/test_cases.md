@@ -204,3 +204,44 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 - MQTT 数据发布到 `lab/16/data`
 - 不建立 TCP 连接
 - MQTT 发布与串口解析保持正常
+
+## 10. 进程生命周期与 systemd 测试
+
+### LIFE-01：信号处理单元测试
+
+测试程序：`shutdown_signal_test`
+
+验证内容：
+
+- SIGINT 被捕获并设置退出标志
+- SIGTERM 被捕获并设置退出标志
+- 信号处理过程不会直接终止测试进程
+
+### LIFE-02：SIGTERM 优雅退出
+
+自动化命令：`./scripts/run_shutdown_smoke_test.sh`
+
+测试步骤：
+
+1. 创建临时 PTY 串口对和隔离配置。
+2. 启动网关并等待进入串口读取循环。
+3. 向网关进程发送 SIGTERM。
+4. 等待进程结束并检查退出码和日志。
+
+预期结果：
+
+- 网关在 5 秒内停止
+- 进程退出码为 `0`
+- 日志包含 `shutdown requested`
+- 日志包含 `edge gateway stopped`
+
+### LIFE-03：systemd 服务管理
+
+安装命令：`sudo ./scripts/install_systemd_service.sh /dev/ttyUSB0`
+
+预期结果：
+
+- 服务以 `iot-gateway` 用户运行
+- `systemctl status linux-iot-edge-gateway` 显示 active
+- `systemctl stop` 后日志记录正常停止
+- 异常退出后 systemd 根据 `Restart=on-failure` 自动拉起

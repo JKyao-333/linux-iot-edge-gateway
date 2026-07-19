@@ -1,39 +1,46 @@
 #include "app/sensor_data.h"
-#include "protocol/frame_parser.h"
-#include "mqtt/mqtt_client.h"
-#include <fcntl.h>
-#include <termios.h>
-#include <unistd.h>
+#include "app/shutdown_signal.h"
 #include "cache/file_cache.h"
+#include "config/gateway_config.h"
+#include "log/logger.h"
+#include "mqtt/mqtt_client.h"
 #include "mqtt/reliable_publisher.h"
+#include "protocol/frame_parser.h"
+#include "tcp/tcp_client.h"
+
 #include <cerrno>
+#include <chrono>
+#include <cstdint>
 #include <cstring>
+#include <fcntl.h>
 #include <iomanip>
 #include <iostream>
 #include <string>
-#include "log/logger.h"
-#include <chrono>
-#include "tcp/tcp_client.h"
-#include "config/gateway_config.h"
-#include <thread>
-static bool configure_serial(int fd, speed_t baudrate) {
+#include <termios.h>
+#include <unistd.h>
+
+namespace {
+
+bool configure_serial(int fd, speed_t baud_rate) {
     termios tty{};
 
     if (tcgetattr(fd, &tty) != 0) {
-        std::cerr << "tcgetattr failed: " << std::strerror(errno) << std::endl;
+        std::cerr
+            << "tcgetattr failed: "
+            << std::strerror(errno)
+            << std::endl;
+
         return false;
     }
 
     cfmakeraw(&tty);
-    cfsetispeed(&tty, baudrate);
-    cfsetospeed(&tty, baudrate);
+    cfsetispeed(&tty, baud_rate);
+    cfsetospeed(&tty, baud_rate);
 
     tty.c_cflag |= CLOCAL;
     tty.c_cflag |= CREAD;
-
     tty.c_cflag &= ~CSIZE;
     tty.c_cflag |= CS8;
-
     tty.c_cflag &= ~PARENB;
     tty.c_cflag &= ~CSTOPB;
     tty.c_cflag &= ~CRTSCTS;
@@ -42,42 +49,40 @@ static bool configure_serial(int fd, speed_t baudrate) {
     tty.c_cc[VTIME] = 10;
 
     if (tcsetattr(fd, TCSANOW, &tty) != 0) {
-        std::cerr << "tcsetattr failed: " << std::strerror(errno) << std::endl;
+        std::cerr
+            << "tcsetattr failed: "
+            << std::strerror(errno)
+            << std::endl;
+
         return false;
     }
 
     return true;
 }
 
-static speed_t to_termios_baud_rate(
-    int baud_rate) {
-
+speed_t to_termios_baud_rate(int baud_rate) {
     switch (baud_rate) {
         case 9600:
             return B9600;
-
         case 19200:
             return B19200;
-
         case 38400:
             return B38400;
-
         case 57600:
             return B57600;
-
         case 115200:
             return B115200;
-
         default:
             return B115200;
     }
 }
-static int open_serial_device(
+
+int open_serial_device(
     const std::string& device,
     speed_t baud_rate,
-    logging::Logger& logger
-) {
-    int fd = open(
+    logging::Logger& logger) {
+
+    const int fd = open(
         device.c_str(),
         O_RDWR | O_NOCTTY | O_SYNC
     );
@@ -88,14 +93,16 @@ static int open_serial_device(
             "open failed: " + device
                 + ", error: " + std::strerror(errno)
         );
+
         return -1;
     }
 
-if (!configure_serial(fd, baud_rate)) {
+    if (!configure_serial(fd, baud_rate)) {
         logger.error(
             "serial",
             "configure failed: " + device
         );
+
         close(fd);
         return -1;
     }
@@ -107,44 +114,66 @@ if (!configure_serial(fd, baud_rate)) {
 
     return fd;
 }
-static void print_raw_bytes(const unsigned char* buffer, ssize_t length) {
+
+void close_serial_device(int& fd) {
+    if (fd < 0) {
+        return;
+    }
+
+    close(fd);
+    fd = -1;
+}
+
+void print_raw_bytes(
+    const unsigned char* buffer,
+    ssize_t length) {
+
     std::cout << "RX " << length << " bytes: ";
 
-    for (ssize_t i = 0; i < length; ++i) {
-        std::cout << "0x"
-                  << std::uppercase
-                  << std::hex
-                  << std::setw(2)
-                  << std::setfill('0')
-                  << static_cast<int>(buffer[i])
-                  << " ";
+    for (ssize_t index = 0; index < length; ++index) {
+        std::cout
+            << "0x"
+            << std::uppercase
+            << std::hex
+            << std::setw(2)
+            << std::setfill('0')
+            << static_cast<int>(buffer[index])
+            << " ";
     }
 
     std::cout << std::dec << std::endl;
 }
 
-static void print_frame(const protocol::Frame& frame) {
-    std::cout << "Parsed frame: cmd=0x"
-              << std::uppercase << std::hex << std::setw(2)
-              << std::setfill('0') << static_cast<int>(frame.cmd)
-              << " device_id=0x"
-              << std::setw(2) << static_cast<int>(frame.device_id)
-              << " payload=";
+void print_frame(const protocol::Frame& frame) {
+    std::cout
+        << "Parsed frame: cmd=0x"
+        << std::uppercase
+        << std::hex
+        << std::setw(2)
+        << std::setfill('0')
+        << static_cast<int>(frame.cmd)
+        << " device_id=0x"
+        << std::setw(2)
+        << static_cast<int>(frame.device_id)
+        << " payload=";
 
-    for (uint8_t byte : frame.payload) {
-        std::cout << "0x"
-                  << std::setw(2)
-                  << static_cast<int>(byte)
-                  << " ";
+    for (std::uint8_t byte : frame.payload) {
+        std::cout
+            << "0x"
+            << std::setw(2)
+            << static_cast<int>(byte)
+            << " ";
     }
 
-    std::cout << "crc=0x"
-              << std::setw(4)
-              << frame.crc
-              << std::dec
-              << std::endl;
+    std::cout
+        << "crc=0x"
+        << std::setw(4)
+        << frame.crc
+        << std::dec
+        << std::endl;
 }
-static std::string build_mqtt_topic(
+
+std::string build_mqtt_topic(
     const std::string& topic_prefix,
     const app::SensorData& sensor_data) {
 
@@ -155,43 +184,52 @@ static std::string build_mqtt_topic(
         + "/data";
 }
 
-static void handle_frame(
+void handle_frame(
     const protocol::Frame& frame,
     const std::string& mqtt_topic_prefix,
     bool tcp_enabled,
     mqtt::ReliablePublisher& publisher,
     tcp::TcpClient& tcp_client,
     logging::Logger& logger) {
+
     print_frame(frame);
 
     app::SensorData sensor_data;
     app::parse_sensor_data(frame, sensor_data);
 
-    const std::string json = app::sensor_data_to_json(sensor_data);
+    const std::string json =
+        app::sensor_data_to_json(sensor_data);
 
-    if (sensor_data.valid) {
-        logger.info(
-    "sensor",
-    "parsed data: " + json
-);
-
-        const std::string topic = build_mqtt_topic(mqtt_topic_prefix,sensor_data);
-        publisher.publish(topic, json);
-           if (tcp_enabled && !tcp_client.send_json(json)) {
-            logger.warn(
-                "tcp",
-                "TCP publish failed"
-            );
-        }
-     } else {
+    if (!sensor_data.valid) {
         logger.warn(
-    "sensor",
-    "invalid data: " + json
-);
+            "sensor",
+            "invalid data: " + json
+        );
+
+        return;
     }
 
+    logger.info(
+        "sensor",
+        "parsed data: " + json
+    );
+
+    const std::string topic = build_mqtt_topic(
+        mqtt_topic_prefix,
+        sensor_data
+    );
+
+    publisher.publish(topic, json);
+
+    if (tcp_enabled && !tcp_client.send_json(json)) {
+        logger.warn(
+            "tcp",
+            "TCP publish failed"
+        );
+    }
 }
-static logging::Level parse_log_level(
+
+logging::Level parse_log_level(
     const std::string& level) {
 
     if (level == "INFO") {
@@ -208,50 +246,19 @@ static logging::Level parse_log_level(
 
     return logging::Level::Debug;
 }
-int main(int argc, char* argv[]) {
-    const std::string config_path =
-        argc >= 2
-            ? argv[1]
-            : "config/gateway.yaml";
 
-    config::GatewayConfig gateway_config;
-    std::string config_error;
+int run_gateway(
+    const config::GatewayConfig& gateway_config,
+    const std::string& device,
+    logging::Logger& logger) {
 
-    if (!config::load_gateway_config(
-            config_path,
-            gateway_config,
-            config_error)) {
-
-        std::cerr
-            << "load config failed: "
-            << config_error
-            << std::endl;
-
-        return 1;
-    }
-    logging::Logger logger(
-        gateway_config.log.path,
-        parse_log_level(
-            gateway_config.log.level
-        )
-    );
-logger.info(
-    "app",
-    "edge gateway starting"
-);
-
-
-    const std::string device =
-        argc >= 3
-            ? argv[2]
-            : gateway_config.serial.device;
-     const speed_t serial_baud_rate =
+    const speed_t serial_baud_rate =
         to_termios_baud_rate(
             gateway_config.serial.baud_rate
         );
-        const int serial_reconnect_seconds =
-        gateway_config.serial
-            .reconnect_interval_seconds;
+
+    const int serial_reconnect_seconds =
+        gateway_config.serial.reconnect_interval_seconds;
 
     const auto serial_reconnect_interval =
         std::chrono::seconds(
@@ -260,101 +267,122 @@ logger.info(
 
     const std::string reconnect_message =
         "retrying in "
-        + std::to_string(
-            serial_reconnect_seconds
-        )
+        + std::to_string(serial_reconnect_seconds)
         + " seconds";
+
     int fd = -1;
 
-    while (fd < 0) {
-	fd = open_serial_device(
+    while (fd < 0 && !app::shutdown_requested()) {
+        fd = open_serial_device(
             device,
             serial_baud_rate,
             logger
         );
+
         if (fd < 0) {
             logger.warn(
                 "serial",
                 reconnect_message
             );
 
-            std::this_thread::sleep_for(
+            app::wait_for_shutdown(
                 serial_reconnect_interval
             );
         }
     }
-    logger.info(
-    "serial",
-    "serial opened: " + device
-);
 
-logger.info(
-    "serial",
-    "waiting for raw bytes"
-);
+    if (app::shutdown_requested()) {
+        close_serial_device(fd);
+        return 0;
+    }
+
+    logger.info(
+        "serial",
+        "waiting for raw bytes"
+    );
+
     protocol::FrameParser parser;
-        mqtt::MqttClient mqtt_client(
+    mqtt::MqttClient mqtt_client(
         gateway_config.mqtt.host,
         gateway_config.mqtt.port
     );
     cache::FileCache file_cache(
-    gateway_config.cache.path
-);
-
-mqtt::ReliablePublisher publisher(
-    mqtt_client,
-    file_cache
-);
-tcp::TcpClient tcp_client(
-    gateway_config.tcp.host,
+        gateway_config.cache.path
+    );
+    mqtt::ReliablePublisher publisher(
+        mqtt_client,
+        file_cache
+    );
+    tcp::TcpClient tcp_client(
+        gateway_config.tcp.host,
         gateway_config.tcp.port
-);
-logger.info(
-    "cache",
-    "checking cached mqtt messages"
-);
-
-publisher.flush_cache();
-const auto cache_retry_interval =
-    std::chrono::seconds(
-        gateway_config.mqtt.cache_retry_interval_seconds
     );
 
+    logger.info(
+        "cache",
+        "checking cached mqtt messages"
+    );
+
+    publisher.flush_cache();
+
+    const auto cache_retry_interval =
+        std::chrono::seconds(
+            gateway_config.mqtt
+                .cache_retry_interval_seconds
+        );
+
+    auto last_cache_retry =
+        std::chrono::steady_clock::now();
+
     unsigned char buffer[256];
-auto last_cache_retry =
-    std::chrono::steady_clock::now();
-    while (true) {
-        ssize_t n = read(fd, buffer, sizeof(buffer));
-        if (n < 0) {
-            const std::string error_message =
-                std::strerror(errno);
+
+    while (!app::shutdown_requested()) {
+        const ssize_t received = read(
+            fd,
+            buffer,
+            sizeof(buffer)
+        );
+
+        if (received < 0) {
+            if (errno == EINTR
+                && app::shutdown_requested()) {
+
+                break;
+            }
 
             logger.warn(
                 "serial",
-                "read failed: " + error_message
+                "read failed: "
+                    + std::string(std::strerror(errno))
             );
 
-            close(fd);
-            fd = -1;
-
-            // 丢弃断线前尚未完成的半帧。
+            close_serial_device(fd);
             parser.reset();
 
-            while (fd < 0) {
+            while (fd < 0
+                   && !app::shutdown_requested()) {
+
                 logger.warn(
                     "serial",
-		   "connection lost, " + reconnect_message
+                    "connection lost, "
+                        + reconnect_message
                 );
 
-                std::this_thread::sleep_for(
-                    serial_reconnect_interval
-                );
+                if (app::wait_for_shutdown(
+                        serial_reconnect_interval)) {
 
-		fd = open_serial_device(
+                    break;
+                }
+
+                fd = open_serial_device(
                     device,
                     serial_baud_rate,
                     logger
                 );
+            }
+
+            if (app::shutdown_requested()) {
+                break;
             }
 
             logger.info(
@@ -364,55 +392,136 @@ auto last_cache_retry =
 
             continue;
         }
-const auto now =
-    std::chrono::steady_clock::now();
 
-if (now - last_cache_retry
-    >= cache_retry_interval) {
+        const auto now =
+            std::chrono::steady_clock::now();
 
-    publisher.flush_cache();
-    last_cache_retry = now;
-}
+        if (now - last_cache_retry
+            >= cache_retry_interval) {
 
-        if (n == 0) {
+            publisher.flush_cache();
+            last_cache_retry = now;
+        }
+
+        if (received == 0) {
             continue;
         }
 
-        print_raw_bytes(buffer, n);
+        print_raw_bytes(buffer, received);
 
-        auto frames = parser.feed(buffer, static_cast<std::size_t>(n));
+        const auto frames = parser.feed(
+            buffer,
+            static_cast<std::size_t>(received)
+        );
+
         const std::size_t crc_error_count =
-    parser.take_crc_error_count();
+            parser.take_crc_error_count();
 
-if (crc_error_count > 0) {
-    logger.warn(
-        "protocol",
-        "CRC validation failed, count="
-            + std::to_string(crc_error_count)
-    );
-}
-const std::size_t length_error_count =
-    parser.take_length_error_count();
+        if (crc_error_count > 0) {
+            logger.warn(
+                "protocol",
+                "CRC validation failed, count="
+                    + std::to_string(crc_error_count)
+            );
+        }
 
-if (length_error_count > 0) {
-    logger.warn(
-        "protocol",
-        "invalid payload length, count="
-            + std::to_string(length_error_count)
-    );
-}
-	for (const auto& frame : frames) {
-handle_frame(
-    frame,
-    gateway_config.mqtt.topic_prefix,
-    gateway_config.tcp.enabled,
-    publisher,
-    tcp_client,
-    logger
-);
+        const std::size_t length_error_count =
+            parser.take_length_error_count();
+
+        if (length_error_count > 0) {
+            logger.warn(
+                "protocol",
+                "invalid payload length, count="
+                    + std::to_string(length_error_count)
+            );
+        }
+
+        for (const auto& frame : frames) {
+            handle_frame(
+                frame,
+                gateway_config.mqtt.topic_prefix,
+                gateway_config.tcp.enabled,
+                publisher,
+                tcp_client,
+                logger
+            );
         }
     }
 
-    close(fd);
+    close_serial_device(fd);
+    tcp_client.disconnect();
     return 0;
+}
+
+}  // namespace
+
+int main(int argc, char* argv[]) {
+    const std::string config_path =
+        argc >= 2
+            ? argv[1]
+            : "config/gateway.yaml";
+
+    config::GatewayConfig gateway_config;
+    std::string error_message;
+
+    if (!config::load_gateway_config(
+            config_path,
+            gateway_config,
+            error_message)) {
+
+        std::cerr
+            << "load config failed: "
+            << error_message
+            << std::endl;
+
+        return 1;
+    }
+
+    logging::Logger logger(
+        gateway_config.log.path,
+        parse_log_level(gateway_config.log.level)
+    );
+
+    if (!app::install_shutdown_signal_handlers(
+            error_message)) {
+
+        logger.error(
+            "app",
+            error_message
+        );
+
+        return 1;
+    }
+
+    logger.info(
+        "app",
+        "edge gateway starting"
+    );
+
+    const std::string device =
+        argc >= 3
+            ? argv[2]
+            : gateway_config.serial.device;
+
+    const int result = run_gateway(
+        gateway_config,
+        device,
+        logger
+    );
+
+    if (app::shutdown_requested()) {
+        logger.info(
+            "app",
+            "shutdown requested"
+        );
+    }
+
+    if (result == 0) {
+        logger.info(
+            "app",
+            "edge gateway stopped"
+        );
+    }
+
+    return result;
 }

@@ -18,6 +18,8 @@
 - Broker 离线消息落盘
 - Broker 恢复后缓存补传
 - 串口断开检测与自动重连
+- SIGINT/SIGTERM 优雅退出
+- systemd 后台服务与故障拉起
 - DEBUG、INFO、WARN、ERROR 日志
 - Python、Shell 和 CTest 自动化测试
 
@@ -83,6 +85,7 @@ MQTT Topic：
 - `src/tcp/`：原生 TCP Socket 客户端
 - `src/cache/`：本地文件缓存
 - `src/log/`：分级日志
+- `deploy/systemd/`：systemd 服务单元
 - `scripts/`：模拟器和自动化测试脚本
 - `tests/`：C++ 测试
 - `docs/`：架构、协议、测试和调试文档
@@ -176,13 +179,14 @@ Ubuntu 安装命令：
 
 1. CMake 配置
 2. C++ 工程编译
-3. 20 个 CTest 测试
+3. 21 个 CTest 测试
 4. YAML 正常配置与异常配置测试
-5. 虚拟串口创建
-6. Python 半包发送
-7. 串口协议解析与 JSON 生成
-8. MQTT 发布验证
-9. 原生 TCP 发布验证
+5. SIGTERM 优雅退出验证
+6. 虚拟串口创建
+7. Python 半包发送
+8. 串口协议解析与 JSON 生成
+9. MQTT 发布验证
+10. 原生 TCP 发布验证
 成功时最终输出：
 
 `[PASS] all smoke tests passed`
@@ -195,7 +199,7 @@ Ubuntu 安装命令：
 
 启动网关：
 
-`~/linux-iot-edge-gateway-build/`~/linux-iot-edge-gateway-build/edge_gateway config/gateway.yaml /tmp/tty_gateway`
+`~/linux-iot-edge-gateway-build/edge_gateway config/gateway.yaml /tmp/tty_gateway`
 
 发送正常数据：
 
@@ -213,6 +217,21 @@ Ubuntu 安装命令：
 
 `mosquitto_sub -h localhost -p 1883 -t 'sensor/+/data' -v`
 
+## systemd 服务部署
+
+完成编译后，可将网关安装为 Linux 后台服务。参数为实际串口设备，省略时默认使用 `/dev/ttyUSB0`：
+
+`sudo ./scripts/install_systemd_service.sh /dev/ttyUSB0`
+
+常用管理命令：
+
+- 查看状态：`systemctl status linux-iot-edge-gateway`
+- 实时日志：`journalctl -u linux-iot-edge-gateway -f`
+- 重启服务：`sudo systemctl restart linux-iot-edge-gateway`
+- 停止服务：`sudo systemctl stop linux-iot-edge-gateway`
+
+停止服务时，systemd 发送 SIGTERM。网关会退出串口读取或重连循环，关闭文件描述符和网络客户端，记录停止日志并以状态码 `0` 退出。完整部署说明见 [systemd 部署指南](docs/deployment.md)。
+
 ## 可靠性设计
 
 ### 串口侧
@@ -224,6 +243,13 @@ Ubuntu 安装命令：
 - 串口不存在时每 2 秒重试
 - 运行中断线后自动重新连接
 - 重连时清除断线前残留半帧
+
+### 进程生命周期
+
+- 使用 `sigaction()` 捕获 SIGINT 和 SIGTERM
+- 信号处理函数只设置异步信号安全标志
+- 串口读取、首次连接和重连等待均响应退出请求
+- systemd 异常退出自动拉起，正常停止不会重启
 
 ### MQTT 侧
 
@@ -237,7 +263,7 @@ Ubuntu 安装命令：
 
 当前自动化测试结果：
 
-- CTest：20/20 通过
+- CTest：21/21 通过
 - CRC、半包、粘包和异常帧测试通过
 - 数据解析、清洗和 JSON 测试通过
 - MQTT 发布、离线缓存和补传测试通过
@@ -245,6 +271,7 @@ Ubuntu 安装命令：
 - C++ TCP 客户端与 Python TCP 服务端 smoke test 通过
 - 串口数据同时上报 MQTT 与 TCP 的手工联调通过
 - 串口断开与恢复测试通过
+- SIGINT/SIGTERM 单元测试和进程优雅退出 smoke test 通过
 
 ## 项目文档
 
@@ -252,6 +279,7 @@ Ubuntu 安装命令：
 - [协议说明](docs/protocol.md)
 - [测试用例](docs/test_cases.md)
 - [调试记录](docs/debug_record.md)
+- [systemd 部署指南](docs/deployment.md)
 
 ## 当前实现说明
 
@@ -263,5 +291,4 @@ Ubuntu 安装命令：
 - 将文件缓存升级为 SQLite
 - 抽象统一 Publisher 接口
 - 增加多串口和多设备并发
-- 增加 systemd 服务
 - 增加 ARM 交叉编译

@@ -28,6 +28,11 @@ echo "[INFO] running CTest"
 ctest \
     --test-dir "${BUILD_DIR}" \
     --output-on-failure
+
+echo "[INFO] running graceful shutdown smoke test"
+
+"${PROJECT_DIR}/scripts/run_shutdown_smoke_test.sh"
+
 echo "[INFO] running serial-to-MQTT smoke test"
 
 "${PROJECT_DIR}/scripts/run_serial_smoke_test.sh"

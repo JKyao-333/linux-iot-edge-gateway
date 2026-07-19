@@ -1,5 +1,4 @@
-# Reference configuration.
-# YAML loading will be added in a later version.
+# Development configuration for local and WSL testing.
 
 serial:
   device: /tmp/tty_gateway
