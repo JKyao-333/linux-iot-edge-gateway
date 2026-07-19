@@ -202,6 +202,111 @@ int main() {
         return 1;
     }
 
+    if (!write_file(
+            test_path,
+            "mqtt:\n"
+            "  password: secret\n")) {
+
+        std::cerr
+            << "failed to write password-only MQTT config"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(
+            test_path,
+            "requires mqtt.username")) {
+
+        std::cerr
+            << "MQTT password without username was not rejected"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "mqtt:\n"
+            "  tls:\n"
+            "    enabled: true\n")) {
+
+        std::cerr
+            << "failed to write TLS config without CA"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(
+            test_path,
+            "ca_file")) {
+
+        std::cerr
+            << "TLS config without CA was not rejected"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "mqtt:\n"
+            "  tls:\n"
+            "    enabled: true\n"
+            "    ca_file: /tmp/ca.crt\n"
+            "    certificate_file: /tmp/client.crt\n")) {
+
+        std::cerr
+            << "failed to write incomplete mTLS config"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(
+            test_path,
+            "configured together")) {
+
+        std::cerr
+            << "incomplete mTLS config was not rejected"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "mqtt:\n"
+            "  tls:\n"
+            "    insecure: true\n")) {
+
+        std::cerr
+            << "failed to write insecure non-TLS config"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(
+            test_path,
+            "requires TLS")) {
+
+        std::cerr
+            << "TLS insecure flag without TLS was not rejected"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
     std::remove(test_path.c_str());
 
     std::cout

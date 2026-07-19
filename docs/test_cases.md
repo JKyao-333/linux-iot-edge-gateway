@@ -2,7 +2,7 @@
 
 ## 1. 测试目标
 
-项目测试覆盖 CRC16、自定义协议解析、半包与粘包、异常帧过滤、传感器数据清洗、JSON 封装、MQTT 发布、离线缓存、恢复补传、串口重连、多串口并发和日志记录。
+项目测试覆盖 CRC16、自定义协议解析、半包与粘包、异常帧过滤、传感器数据清洗、JSON 封装、MQTT 发布、认证与 TLS、离线缓存、恢复补传、串口重连、多串口并发和日志记录。
 
 ## 2. 测试环境
 
@@ -12,6 +12,7 @@
 - Python 3.10 / pyserial
 - socat
 - Mosquitto 2.0
+- OpenSSL 3
 
 ## 3. 自动化测试命令
 
@@ -21,7 +22,7 @@
 
 仅运行 CTest：`ctest --test-dir ~/linux-iot-edge-gateway-build --output-on-failure`
 
-通过标准：24 个 CTest、单串口与双串口 MQTT 端到端测试、TCP smoke test 和缓存迁移测试全部通过。
+通过标准：24 个 CTest、单串口与双串口 MQTT 端到端测试、MQTT 认证与 TLS smoke test、TCP smoke test 和缓存迁移测试全部通过。
 ## 4. C++ 测试矩阵
 
 | 编号 | 测试目标 | 验证内容 |
@@ -63,6 +64,8 @@
 | FT-004 | 运行中串口断开再恢复 | 自动重连并继续接收数据 |
 | FT-005 | MQTT Broker 离线 | 发布失败消息写入本地缓存 |
 | FT-006 | MQTT Broker 恢复 | SQLite 队列按顺序补传并删除已确认消息 |
+| SEC-001 | 使用临时 CA、服务端证书和密码文件启动隔离 Broker | C++ 客户端认证成功、TLS 校验成功并完成 QoS 1 发布 |
+| SEC-002 | 密码无用户名或 TLS 缺少必要证书字段 | 配置加载失败并返回明确原因 |
 
 ## 6. 串口端到端测试
 

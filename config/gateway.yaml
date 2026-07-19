@@ -11,6 +11,14 @@ mqtt:
   port: 1883
   topic_prefix: sensor
   cache_retry_interval_seconds: 5
+  username: ""
+  password: ""
+  tls:
+    enabled: false
+    ca_file: ""
+    certificate_file: ""
+    private_key_file: ""
+    insecure: false
 
 tcp:
   enabled: true

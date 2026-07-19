@@ -25,6 +25,7 @@
 #include <termios.h>
 #include <thread>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -448,9 +449,23 @@ int run_gateway(
     const std::vector<std::string>& devices,
     logging::Logger& logger) {
 
+    mqtt::MqttClientOptions mqtt_options;
+    mqtt_options.username = gateway_config.mqtt.username;
+    mqtt_options.password = gateway_config.mqtt.password;
+    mqtt_options.tls_enabled =
+        gateway_config.mqtt.tls.enabled;
+    mqtt_options.ca_file = gateway_config.mqtt.tls.ca_file;
+    mqtt_options.certificate_file =
+        gateway_config.mqtt.tls.certificate_file;
+    mqtt_options.private_key_file =
+        gateway_config.mqtt.tls.private_key_file;
+    mqtt_options.tls_insecure =
+        gateway_config.mqtt.tls.insecure;
+
     mqtt::MqttClient mqtt_client(
         gateway_config.mqtt.host,
-        gateway_config.mqtt.port
+        gateway_config.mqtt.port,
+        std::move(mqtt_options)
     );
 
     std::unique_ptr<cache::MessageCache> message_cache;

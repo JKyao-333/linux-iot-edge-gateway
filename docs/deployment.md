@@ -76,6 +76,10 @@
 
 默认生产配置启用 MQTT，关闭 TCP。需要 TCP 双通道上报时，将 `tcp.enabled` 改为 `true`，并配置服务端地址和端口。
 
+生产 Broker 启用认证或 TLS 时，设置 `mqtt.username`、`mqtt.password` 和 `mqtt.tls`。`mqtt.tls.ca_file` 应指向可信 CA 文件；双向 TLS 还需同时配置 `certificate_file` 与 `private_key_file`。生产环境必须保持 `mqtt.tls.insecure: false`。
+
+不要把真实密码和私钥提交到 Git。生产配置由安装脚本以 `root:iot-gateway`、`0640` 权限安装到 `/etc/linux-iot-edge-gateway/gateway.yaml`，证书和私钥也应限制为仅服务账户可读。
+
 默认缓存配置为 `cache.type: sqlite`，数据库位于 `/var/lib/linux-iot-edge-gateway/pending_messages.db`。查看待补传记录：
 
 `sudo sqlite3 /var/lib/linux-iot-edge-gateway/pending_messages.db 'SELECT id, topic, created_at FROM pending_messages ORDER BY id;'`

@@ -31,10 +31,33 @@ bool wait_for_connection(
 
 }  // namespace
 
-int main() {
+int main(int argc, char* argv[]) {
+    const std::string host =
+        argc >= 2 ? argv[1] : "localhost";
+
+    const std::uint16_t port =
+        argc >= 3
+            ? static_cast<std::uint16_t>(
+                std::stoi(argv[2])
+            )
+            : 1883;
+
+    mqtt::MqttClientOptions options;
+
+    if (argc >= 5) {
+        options.username = argv[3];
+        options.password = argv[4];
+    }
+
+    if (argc >= 6) {
+        options.tls_enabled = true;
+        options.ca_file = argv[5];
+    }
+
     mqtt::MqttClient client(
-        "localhost",
-        1883
+        host,
+        port,
+        options
     );
 
     if (!wait_for_connection(

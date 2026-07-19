@@ -115,7 +115,7 @@ Ubuntu 安装命令：
 
 `sudo apt update`
 
-`sudo apt install -y build-essential cmake git python3 python3-pip socat mosquitto mosquitto-clients libmosquitto-dev pkg-config libyaml-cpp-dev libsqlite3-dev sqlite3`
+`sudo apt install -y build-essential cmake git python3 python3-pip socat mosquitto mosquitto-clients libmosquitto-dev openssl pkg-config libyaml-cpp-dev libsqlite3-dev sqlite3`
 安装 pyserial：
 
 `python3 -m pip install pyserial`
@@ -134,6 +134,13 @@ Ubuntu 安装命令：
 | `mqtt.port` | MQTT Broker 端口 |
 | `mqtt.topic_prefix` | MQTT Topic 前缀 |
 | `mqtt.cache_retry_interval_seconds` | 离线缓存补传周期 |
+| `mqtt.username` | MQTT 用户名，留空时不启用认证 |
+| `mqtt.password` | MQTT 密码，配置后必须同时提供用户名 |
+| `mqtt.tls.enabled` | 是否启用 MQTT TLS |
+| `mqtt.tls.ca_file` | 用于验证 Broker 证书的 CA 文件 |
+| `mqtt.tls.certificate_file` | 可选的客户端证书，用于双向 TLS |
+| `mqtt.tls.private_key_file` | 可选的客户端私钥，必须与客户端证书同时配置 |
+| `mqtt.tls.insecure` | 是否跳过 Broker 主机名校验，仅限本地调试 |
 | `tcp.enabled` | 是否启用 TCP 上报 |
 | `tcp.host` | TCP Server 地址 |
 | `tcp.port` | TCP Server 端口 |
@@ -197,6 +204,7 @@ Ubuntu 安装命令：
 10. 双虚拟串口并发接入与不同设备 Topic 验证
 11. SQLite 缓存迁移验证
 12. 原生 TCP 发布验证
+13. MQTT 用户认证、CA 校验和 TLS 加密发布验证
 成功时最终输出：
 
 `[PASS] all smoke tests passed`
@@ -282,6 +290,7 @@ Ubuntu 安装命令：
 - CRC、半包、粘包和异常帧测试通过
 - 数据解析、清洗和 JSON 测试通过
 - MQTT 发布、离线缓存和补传测试通过
+- MQTT 用户认证和 TLS 加密 smoke test 通过
 - 串口到 MQTT 端到端 smoke test 通过
 - 双串口并发接入与多设备 MQTT Topic smoke test 通过
 - C++ TCP 客户端与 Python TCP 服务端 smoke test 通过
@@ -299,7 +308,7 @@ Ubuntu 安装命令：
 
 ## 当前实现说明
 
-当前 MQTT 客户端基于 `libmosquitto` 实现原生长连接，使用独立网络循环处理连接状态和消息回调。
+当前 MQTT 客户端基于 `libmosquitto` 实现原生长连接，使用独立网络循环处理连接状态和消息回调，并支持用户名/密码认证、CA 证书校验以及可选的双向 TLS。
 
 传感器消息采用 QoS 1 发布，网关等待 Broker 返回 PUBACK 后才确认发送成功；连接中断时自动重连，离线消息默认写入 SQLite 持久化队列，连接恢复后按原顺序补传。`MessageCache` 接口隔离业务层与缓存实现，仍可通过 `cache.type: file` 使用兼容文件后端。
 
@@ -312,5 +321,4 @@ MQTT 与 TCP 均实现统一的 `Publisher` 接口。`PublisherGroup` 根据 YAM
 迁移脚本会校验全部旧记录、在事务中写入数据库，并将原文件重命名为 `.migrated` 备份。
 ## 后续计划
 
-- 增加 MQTT 用户认证和 TLS 加密
 - 增加 ARM 交叉编译

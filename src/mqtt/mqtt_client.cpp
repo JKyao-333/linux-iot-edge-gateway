@@ -10,9 +10,11 @@ namespace mqtt {
 
 MqttClient::MqttClient(
     std::string host,
-    std::uint16_t port)
+    std::uint16_t port,
+    MqttClientOptions options)
     : host_(std::move(host)),
-      port_(port) {
+      port_(port),
+      options_(std::move(options)) {
 
     initialize();
 }
@@ -62,6 +64,10 @@ bool MqttClient::initialize() {
             << "[ERROR] mosquitto client creation failed"
             << std::endl;
 
+        return false;
+    }
+
+    if (!configure_security()) {
         return false;
     }
 
@@ -130,7 +136,84 @@ bool MqttClient::initialize() {
         << host_
         << ":"
         << port_
+        << ", authentication="
+        << (options_.username.empty()
+                ? "disabled"
+                : "enabled")
+        << ", tls="
+        << (options_.tls_enabled
+                ? "enabled"
+                : "disabled")
         << std::endl;
+
+    return true;
+}
+
+bool MqttClient::configure_security() {
+    if (!options_.username.empty()) {
+        const int result = mosquitto_username_pw_set(
+            client_,
+            options_.username.c_str(),
+            options_.password.empty()
+                ? nullptr
+                : options_.password.c_str()
+        );
+
+        if (result != MOSQ_ERR_SUCCESS) {
+            std::cerr
+                << "[ERROR] MQTT authentication setup failed: "
+                << mosquitto_strerror(result)
+                << std::endl;
+
+            return false;
+        }
+    }
+
+    if (!options_.tls_enabled) {
+        return true;
+    }
+
+    const char* certificate_file =
+        options_.certificate_file.empty()
+            ? nullptr
+            : options_.certificate_file.c_str();
+
+    const char* private_key_file =
+        options_.private_key_file.empty()
+            ? nullptr
+            : options_.private_key_file.c_str();
+
+    int result = mosquitto_tls_set(
+        client_,
+        options_.ca_file.c_str(),
+        nullptr,
+        certificate_file,
+        private_key_file,
+        nullptr
+    );
+
+    if (result != MOSQ_ERR_SUCCESS) {
+        std::cerr
+            << "[ERROR] MQTT TLS setup failed: "
+            << mosquitto_strerror(result)
+            << std::endl;
+
+        return false;
+    }
+
+    result = mosquitto_tls_insecure_set(
+        client_,
+        options_.tls_insecure
+    );
+
+    if (result != MOSQ_ERR_SUCCESS) {
+        std::cerr
+            << "[ERROR] MQTT TLS hostname policy failed: "
+            << mosquitto_strerror(result)
+            << std::endl;
+
+        return false;
+    }
 
     return true;
 }

@@ -14,11 +14,22 @@ struct SerialConfig {
     int reconnect_interval_seconds = 2;
 };
 
+struct MqttTlsConfig {
+    bool enabled = false;
+    std::string ca_file;
+    std::string certificate_file;
+    std::string private_key_file;
+    bool insecure = false;
+};
+
 struct MqttConfig {
     std::string host = "localhost";
     std::uint16_t port = 1883;
     std::string topic_prefix = "sensor";
     int cache_retry_interval_seconds = 5;
+    std::string username;
+    std::string password;
+    MqttTlsConfig tls;
 };
 
 struct TcpConfig {

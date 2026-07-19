@@ -29,6 +29,10 @@ ctest \
     --test-dir "${BUILD_DIR}" \
     --output-on-failure
 
+echo "[INFO] running MQTT authentication and TLS smoke test"
+
+"${PROJECT_DIR}/scripts/run_mqtt_security_smoke_test.sh"
+
 echo "[INFO] running graceful shutdown smoke test"
 
 "${PROJECT_DIR}/scripts/run_shutdown_smoke_test.sh"

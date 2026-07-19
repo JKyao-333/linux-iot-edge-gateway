@@ -12,11 +12,22 @@ struct mosquitto;
 
 namespace mqtt {
 
+struct MqttClientOptions {
+    std::string username;
+    std::string password;
+    bool tls_enabled = false;
+    std::string ca_file;
+    std::string certificate_file;
+    std::string private_key_file;
+    bool tls_insecure = false;
+};
+
 class MqttClient {
 public:
     MqttClient(
         std::string host,
-        std::uint16_t port
+        std::uint16_t port,
+        MqttClientOptions options = {}
     );
 
     ~MqttClient();
@@ -51,9 +62,11 @@ private:
     );
 
     bool initialize();
+    bool configure_security();
 
     std::string host_;
     std::uint16_t port_ = 1883;
+    MqttClientOptions options_;
 
     struct mosquitto* client_ = nullptr;
 

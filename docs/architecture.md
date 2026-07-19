@@ -90,7 +90,7 @@ ReliablePublisher
 - `src/mqtt/reliable_publisher.h`
 - `src/mqtt/reliable_publisher.cpp`
 
-MqttClient 基于 `libmosquitto` 维护原生 MQTT 长连接，使用独立网络循环处理连接、断开和发布回调。消息采用 QoS 1 发布，收到 Broker 的 PUBACK 后才返回成功，并在连接断开后自动重连。
+MqttClient 基于 `libmosquitto` 维护原生 MQTT 长连接，使用独立网络循环处理连接、断开和发布回调。消息采用 QoS 1 发布，收到 Broker 的 PUBACK 后才返回成功，并在连接断开后自动重连。客户端支持用户名/密码认证和 TLS：使用 CA 文件验证 Broker 证书及主机名，也可同时配置客户端证书和私钥启用双向 TLS。
 
 ReliablePublisher 负责：
 
@@ -212,6 +212,14 @@ ReliablePublisher 负责：
 - 未成功消息继续保留
 - 异常退出时采用至少一次投递语义，可能重复但避免主动丢失
 
+### MQTT 安全性
+
+- 认证与 TLS 参数由 YAML 配置加载，不在业务代码中硬编码
+- 日志只记录认证和 TLS 是否启用，不输出用户名、密码或私钥内容
+- TLS 默认验证 CA 信任链和 Broker 主机名
+- 客户端证书和私钥必须成对配置
+- `mqtt.tls.insecure` 只用于本地证书调试，生产环境应保持 `false`
+
 ### 可观测性
 
 - 记录启动、串口连接和恢复
@@ -232,7 +240,7 @@ ReliablePublisher 负责：
 测试分为四层：
 
 1. C++ 单元测试：验证 CRC、解析器、业务数据、缓存和日志。
-2. MQTT 集成测试：验证发布和缓存恢复。
+2. MQTT 集成测试：验证发布、缓存恢复、用户名认证和 TLS 握手。
 3. 串口端到端测试：验证 Python、PTY、网关和 MQTT 完整链路，包括两个串口并发接入。
 4. 进程生命周期测试：验证信号捕获和 SIGTERM 优雅退出。
 
@@ -242,11 +250,10 @@ ReliablePublisher 负责：
 
 ## 7. 当前边界与后续扩展
 
-当前版本已经使用 `libmosquitto` 实现原生 MQTT 长连接、QoS 1 发布确认和自动重连。ReliablePublisher 通过 `MessageCache` 接口访问缓存，默认使用 SQLite 持久化队列，并在 Broker 恢复后按顺序补传。
+当前版本已经使用 `libmosquitto` 实现原生 MQTT 长连接、QoS 1 发布确认、自动重连、用户名认证和 TLS 加密。ReliablePublisher 通过 `MessageCache` 接口访问缓存，默认使用 SQLite 持久化队列，并在 Broker 恢复后按顺序补传。
 
 后续可扩展：
 
-- 增加 MQTT 用户认证和 TLS 加密
 - 增加 ARM 交叉编译支持
 ## 8. 原生 TCP 上报
 

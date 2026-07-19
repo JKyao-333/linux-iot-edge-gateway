@@ -94,6 +94,15 @@ int main(int argc, char* argv[]) {
             == 1883
         && gateway_config.mqtt.topic_prefix
             == "sensor"
+        && gateway_config.mqtt.username.empty()
+        && gateway_config.mqtt.password.empty()
+        && !gateway_config.mqtt.tls.enabled
+        && gateway_config.mqtt.tls.ca_file.empty()
+        && gateway_config.mqtt.tls
+            .certificate_file.empty()
+        && gateway_config.mqtt.tls
+            .private_key_file.empty()
+        && !gateway_config.mqtt.tls.insecure
         && gateway_config.tcp.enabled
         && gateway_config.tcp.host
             == "127.0.0.1"

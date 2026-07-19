@@ -160,6 +160,54 @@ bool load_gateway_config(
                 gateway_config.mqtt
                     .cache_retry_interval_seconds
             );
+
+            load_if_present(
+                mqtt,
+                "username",
+                gateway_config.mqtt.username
+            );
+
+            load_if_present(
+                mqtt,
+                "password",
+                gateway_config.mqtt.password
+            );
+
+            const YAML::Node tls = mqtt["tls"];
+
+            if (tls) {
+                load_if_present(
+                    tls,
+                    "enabled",
+                    gateway_config.mqtt.tls.enabled
+                );
+
+                load_if_present(
+                    tls,
+                    "ca_file",
+                    gateway_config.mqtt.tls.ca_file
+                );
+
+                load_if_present(
+                    tls,
+                    "certificate_file",
+                    gateway_config.mqtt.tls
+                        .certificate_file
+                );
+
+                load_if_present(
+                    tls,
+                    "private_key_file",
+                    gateway_config.mqtt.tls
+                        .private_key_file
+                );
+
+                load_if_present(
+                    tls,
+                    "insecure",
+                    gateway_config.mqtt.tls.insecure
+                );
+            }
         }
 
         const YAML::Node tcp = root["tcp"];
@@ -299,6 +347,49 @@ bool load_gateway_config(
 
             error_message =
                 "mqtt cache retry interval must be positive";
+
+            return false;
+        }
+
+        if (gateway_config.mqtt.username.empty()
+            && !gateway_config.mqtt.password.empty()) {
+
+            error_message =
+                "mqtt.password requires mqtt.username";
+
+            return false;
+        }
+
+        if (gateway_config.mqtt.tls.enabled
+            && gateway_config.mqtt.tls.ca_file.empty()) {
+
+            error_message =
+                "mqtt.tls.ca_file is required when TLS is enabled";
+
+            return false;
+        }
+
+        const bool has_client_certificate =
+            !gateway_config.mqtt.tls
+                .certificate_file.empty();
+
+        const bool has_private_key =
+            !gateway_config.mqtt.tls
+                .private_key_file.empty();
+
+        if (has_client_certificate != has_private_key) {
+            error_message =
+                "MQTT TLS client certificate and private key "
+                "must be configured together";
+
+            return false;
+        }
+
+        if (!gateway_config.mqtt.tls.enabled
+            && gateway_config.mqtt.tls.insecure) {
+
+            error_message =
+                "mqtt.tls.insecure requires TLS to be enabled";
 
             return false;
         }
