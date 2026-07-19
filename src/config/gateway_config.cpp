@@ -42,6 +42,21 @@ std::string uppercase(std::string value) {
     return value;
 }
 
+std::string lowercase(std::string value) {
+    std::transform(
+        value.begin(),
+        value.end(),
+        value.begin(),
+        [](unsigned char character) {
+            return static_cast<char>(
+                std::tolower(character)
+            );
+        }
+    );
+
+    return value;
+}
+
 bool is_valid_log_level(const std::string& level) {
     return level == "DEBUG"
         || level == "INFO"
@@ -174,6 +189,15 @@ bool load_gateway_config(
         if (cache) {
             load_if_present(
                 cache,
+                "type",
+                gateway_config.cache.type
+            );
+
+            gateway_config.cache.type =
+                lowercase(gateway_config.cache.type);
+
+            load_if_present(
+                cache,
                 "path",
                 gateway_config.cache.path
             );
@@ -258,6 +282,15 @@ bool load_gateway_config(
         if (gateway_config.cache.path.empty()) {
             error_message =
                 "cache.path must not be empty";
+
+            return false;
+        }
+
+        if (gateway_config.cache.type != "sqlite"
+            && gateway_config.cache.type != "file") {
+
+            error_message =
+                "cache.type must be sqlite or file";
 
             return false;
         }

@@ -23,6 +23,9 @@ Testing/
 # Runtime cache
 /data/*
 !/data/.gitkeep
+*.db
+*.db-wal
+*.db-shm
 
 # Runtime logs
 /logs/*

@@ -24,7 +24,8 @@ STM32 / Python 模拟器
 MQTT 发布失败时：
 
 ReliablePublisher
--> FileCache 本地缓存
+-> MessageCache 统一接口
+-> SqliteCache 持久化队列
 -> 周期性重试
 -> Broker 恢复后补传
 -> 删除已成功发布的缓存
@@ -101,14 +102,21 @@ ReliablePublisher 负责：
 
 文件：
 
+- `src/cache/message_cache.h`
 - `src/cache/file_cache.h`
 - `src/cache/file_cache.cpp`
+- `src/cache/sqlite_cache.h`
+- `src/cache/sqlite_cache.cpp`
 
-缓存格式为每行一条消息：
+`MessageCache` 定义追加、FIFO 读取和队首删除接口，使 ReliablePublisher 不依赖具体存储后端。
+
+默认 `SqliteCache` 使用自增 ID 保持消息顺序，表字段包含 Topic、JSON Payload 和创建时间。数据库启用 WAL、`synchronous=FULL`、忙等待和预编译 SQL，既避免手工转义问题，也降低异常掉电造成数据库损坏的风险。
+
+兼容 `FileCache` 仍支持每行一条消息的旧格式：
 
 `topic<TAB>payload`
 
-缓存更新采用临时文件加重命名的方式，避免直接覆盖原文件造成数据损坏。
+文件缓存更新采用临时文件加重命名的方式，避免直接覆盖原文件造成数据损坏。旧文件可通过 `scripts/migrate_file_cache.py` 一次性迁移到 SQLite。
 
 ### 3.6 log
 
@@ -183,9 +191,10 @@ ReliablePublisher 负责：
 
 - 发布失败时消息落盘
 - 缓存保留 Topic 和 JSON Payload
-- Broker 恢复后自动补传
-- 成功消息从缓存中删除
+- SQLite 按自增 ID 保持 FIFO 顺序
+- Broker 恢复后自动补传，收到 PUBACK 后删除队首记录
 - 未成功消息继续保留
+- 异常退出时采用至少一次投递语义，可能重复但避免主动丢失
 
 ### 可观测性
 
@@ -217,13 +226,12 @@ ReliablePublisher 负责：
 
 ## 7. 当前边界与后续扩展
 
-当前版本已经使用 `libmosquitto` 实现原生 MQTT 长连接、QoS 1 发布确认和自动重连。ReliablePublisher 在发布失败时将消息写入本地缓存，并在 Broker 恢复后按顺序补传。
+当前版本已经使用 `libmosquitto` 实现原生 MQTT 长连接、QoS 1 发布确认和自动重连。ReliablePublisher 通过 `MessageCache` 接口访问缓存，默认使用 SQLite 持久化队列，并在 Broker 恢复后按顺序补传。
 
 后续可扩展：
 
 - 抽象统一 Publisher 接口
 - 增加 MQTT 用户认证和 TLS 加密
-- 将文件缓存升级为 SQLite
 - 增加多串口和多设备并发
 - 增加 ARM 交叉编译支持
 ## 8. 原生 TCP 上报

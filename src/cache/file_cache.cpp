@@ -155,4 +155,23 @@ bool FileCache::replace_all(
     return true;
 }
 
+bool FileCache::remove_first(std::size_t count) {
+    if (count == 0) {
+        return true;
+    }
+
+    const auto messages = load_all();
+
+    if (count >= messages.size()) {
+        return replace_all({});
+    }
+
+    return replace_all(
+        std::vector<CachedMessage>(
+            messages.begin() + count,
+            messages.end()
+        )
+    );
+}
+
 }  // namespace cache

@@ -1,6 +1,8 @@
 #include "app/sensor_data.h"
 #include "app/shutdown_signal.h"
 #include "cache/file_cache.h"
+#include "cache/message_cache.h"
+#include "cache/sqlite_cache.h"
 #include "config/gateway_config.h"
 #include "log/logger.h"
 #include "mqtt/mqtt_client.h"
@@ -15,6 +17,7 @@
 #include <fcntl.h>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <termios.h>
 #include <unistd.h>
@@ -306,12 +309,41 @@ int run_gateway(
         gateway_config.mqtt.host,
         gateway_config.mqtt.port
     );
-    cache::FileCache file_cache(
-        gateway_config.cache.path
+
+    std::unique_ptr<cache::MessageCache> message_cache;
+
+    if (gateway_config.cache.type == "sqlite") {
+        auto sqlite_cache =
+            std::make_unique<cache::SqliteCache>(
+                gateway_config.cache.path
+            );
+
+        if (!sqlite_cache->is_ready()) {
+            logger.error(
+                "cache",
+                sqlite_cache->error_message()
+            );
+            close_serial_device(fd);
+            return 1;
+        }
+
+        message_cache = std::move(sqlite_cache);
+    } else {
+        message_cache =
+            std::make_unique<cache::FileCache>(
+                gateway_config.cache.path
+            );
+    }
+
+    logger.info(
+        "cache",
+        "backend=" + gateway_config.cache.type
+            + ", path=" + gateway_config.cache.path
     );
+
     mqtt::ReliablePublisher publisher(
         mqtt_client,
-        file_cache
+        *message_cache
     );
     tcp::TcpClient tcp_client(
         gateway_config.tcp.host,

@@ -63,6 +63,11 @@ int main(int argc, char* argv[]) {
         << std::endl;
 
     std::cout
+        << "cache.type: "
+        << gateway_config.cache.type
+        << std::endl;
+
+    std::cout
         << "cache.path: "
         << gateway_config.cache.path
         << std::endl;
@@ -93,8 +98,10 @@ int main(int argc, char* argv[]) {
             == "127.0.0.1"
         && gateway_config.tcp.port
             == 9000
+        && gateway_config.cache.type
+            == "sqlite"
         && gateway_config.cache.path
-            == "data/pending_messages.cache"
+            == "data/pending_messages.db"
         && gateway_config.log.path
             == "logs/gateway.log"
         && gateway_config.log.level

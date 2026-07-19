@@ -39,7 +39,8 @@ STM32 / Python 模拟器
 发布失败时：
 
 MQTT 发布失败
--> FileCache 本地缓存
+-> MessageCache 统一缓存接口
+-> SqliteCache 持久化队列
 -> 周期性重试
 -> Broker 恢复
 -> 缓存补传
@@ -83,7 +84,7 @@ MQTT Topic：
 - `src/app/`：SensorData、数据清洗和 JSON
 - `src/mqtt/`：MQTT 客户端和可靠发布器
 - `src/tcp/`：原生 TCP Socket 客户端
-- `src/cache/`：本地文件缓存
+- `src/cache/`：SQLite 默认缓存、文件兼容缓存和统一缓存接口
 - `src/log/`：分级日志
 - `deploy/systemd/`：systemd 服务单元
 - `scripts/`：模拟器和自动化测试脚本
@@ -106,11 +107,12 @@ MQTT Topic：
 - libmosquitto-dev
 - pkg-config
 - yaml-cpp
+- SQLite3
 Ubuntu 安装命令：
 
 `sudo apt update`
 
-`sudo apt install -y build-essential cmake git python3 python3-pip socat mosquitto mosquitto-clients libmosquitto-dev pkg-config libyaml-cpp-dev`
+`sudo apt install -y build-essential cmake git python3 python3-pip socat mosquitto mosquitto-clients libmosquitto-dev pkg-config libyaml-cpp-dev libsqlite3-dev sqlite3`
 安装 pyserial：
 
 `python3 -m pip install pyserial`
@@ -132,7 +134,8 @@ Ubuntu 安装命令：
 | `tcp.enabled` | 是否启用 TCP 上报 |
 | `tcp.host` | TCP Server 地址 |
 | `tcp.port` | TCP Server 端口 |
-| `cache.path` | MQTT 离线缓存文件路径 |
+| `cache.type` | 缓存后端，支持 `sqlite` 或 `file` |
+| `cache.path` | MQTT 离线缓存数据库或文件路径 |
 | `log.path` | 网关日志文件路径 |
 | `log.level` | 最低日志级别 |
 
@@ -179,14 +182,15 @@ Ubuntu 安装命令：
 
 1. CMake 配置
 2. C++ 工程编译
-3. 21 个 CTest 测试
+3. 23 个 CTest 测试
 4. YAML 正常配置与异常配置测试
 5. SIGTERM 优雅退出验证
 6. 虚拟串口创建
 7. Python 半包发送
 8. 串口协议解析与 JSON 生成
 9. MQTT 发布验证
-10. 原生 TCP 发布验证
+10. SQLite 缓存迁移验证
+11. 原生 TCP 发布验证
 成功时最终输出：
 
 `[PASS] all smoke tests passed`
@@ -253,17 +257,20 @@ Ubuntu 安装命令：
 
 ### MQTT 侧
 
-- 发布失败后消息写入本地缓存
+- 发布失败后消息写入 SQLite 持久化队列
 - 缓存同时保存 Topic 和 Payload
 - 每 5 秒尝试补传
-- 成功消息从缓存删除
+- 按自增 ID 保持 FIFO 补传顺序
+- 收到 PUBACK 后从队首删除成功消息
 - 失败消息继续保留
+- WAL 与 `synchronous=FULL` 降低异常掉电时的数据损坏风险
+- 采用至少一次投递语义，极端崩溃窗口允许重复但不主动丢弃消息
 
 ## 测试结果
 
 当前自动化测试结果：
 
-- CTest：21/21 通过
+- CTest：23/23 通过
 - CRC、半包、粘包和异常帧测试通过
 - 数据解析、清洗和 JSON 测试通过
 - MQTT 发布、离线缓存和补传测试通过
@@ -285,10 +292,15 @@ Ubuntu 安装命令：
 
 当前 MQTT 客户端基于 `libmosquitto` 实现原生长连接，使用独立网络循环处理连接状态和消息回调。
 
-传感器消息采用 QoS 1 发布，网关等待 Broker 返回 PUBACK 后才确认发送成功；连接中断时自动重连，离线消息写入本地文件缓存，连接恢复后按原顺序补传。
+传感器消息采用 QoS 1 发布，网关等待 Broker 返回 PUBACK 后才确认发送成功；连接中断时自动重连，离线消息默认写入 SQLite 持久化队列，连接恢复后按原顺序补传。`MessageCache` 接口隔离业务层与缓存实现，仍可通过 `cache.type: file` 使用兼容文件后端。
+
+旧版文件缓存可迁移到 SQLite：
+
+`python3 scripts/migrate_file_cache.py data/pending_messages.cache data/pending_messages.db`
+
+迁移脚本会校验全部旧记录、在事务中写入数据库，并将原文件重命名为 `.migrated` 备份。
 ## 后续计划
 
-- 将文件缓存升级为 SQLite
 - 抽象统一 Publisher 接口
 - 增加多串口和多设备并发
 - 增加 ARM 交叉编译

@@ -125,6 +125,31 @@ int main() {
         return 1;
     }
 
+    if (!write_file(
+            test_path,
+            "cache:\n"
+            "  type: redis\n")) {
+
+        std::cerr
+            << "failed to write invalid cache type"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(
+            test_path,
+            "cache.type")) {
+
+        std::cerr
+            << "invalid cache type was not rejected"
+            << std::endl;
+
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
     std::remove(test_path.c_str());
 
     std::cout

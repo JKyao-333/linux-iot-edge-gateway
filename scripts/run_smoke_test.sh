@@ -33,6 +33,10 @@ echo "[INFO] running graceful shutdown smoke test"
 
 "${PROJECT_DIR}/scripts/run_shutdown_smoke_test.sh"
 
+echo "[INFO] running cache migration test"
+
+"${PROJECT_DIR}/scripts/run_cache_migration_test.sh"
+
 echo "[INFO] running serial-to-MQTT smoke test"
 
 "${PROJECT_DIR}/scripts/run_serial_smoke_test.sh"

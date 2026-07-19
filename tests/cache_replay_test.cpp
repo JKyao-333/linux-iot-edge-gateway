@@ -1,9 +1,9 @@
-#include "cache/file_cache.h"
+#include "cache/sqlite_cache.h"
 #include "mqtt/mqtt_client.h"
 #include "mqtt/reliable_publisher.h"
 
 #include <chrono>
-#include <cstdio>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -36,25 +36,40 @@ bool wait_for_connection(
 
 int main() {
     const std::string cache_path =
-        "data/test_cache_replay.cache";
+        "/tmp/test_cache_replay.db";
 
-    std::remove(cache_path.c_str());
-    std::remove((cache_path + ".tmp").c_str());
+    std::error_code remove_error;
+    std::filesystem::remove(cache_path, remove_error);
+    std::filesystem::remove(
+        cache_path + "-wal",
+        remove_error
+    );
+    std::filesystem::remove(
+        cache_path + "-shm",
+        remove_error
+    );
 
-    cache::FileCache file_cache(cache_path);
+    cache::SqliteCache message_cache(cache_path);
 
-    file_cache.append(
+    if (!message_cache.is_ready()) {
+        std::cerr
+            << message_cache.error_message()
+            << std::endl;
+        return 1;
+    }
+
+    message_cache.append(
         "sensor/16/data",
         "{\"sequence\":101,\"valid\":true}"
     );
 
-    file_cache.append(
+    message_cache.append(
         "sensor/16/data",
         "{\"sequence\":102,\"valid\":true}"
     );
 
     const auto before =
-        file_cache.load_all();
+        message_cache.load_all();
 
     mqtt::MqttClient mqtt_client(
         "localhost",
@@ -70,22 +85,19 @@ int main() {
             << "MQTT connection timeout"
             << std::endl;
 
-        std::remove(cache_path.c_str());
-        std::remove((cache_path + ".tmp").c_str());
-
         return 1;
     }
 
     mqtt::ReliablePublisher publisher(
         mqtt_client,
-        file_cache
+        message_cache
     );
 
     const std::size_t published_count =
         publisher.flush_cache();
 
     const auto after =
-        file_cache.load_all();
+        message_cache.load_all();
 
     std::cout
         << "before count: "
@@ -106,9 +118,6 @@ int main() {
         before.size() == 2
         && published_count == 2
         && after.empty();
-
-    std::remove(cache_path.c_str());
-    std::remove((cache_path + ".tmp").c_str());
 
     return passed ? 0 : 1;
 }

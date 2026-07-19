@@ -17,7 +17,8 @@ tcp:
   port: 9000
 
 cache:
-  path: data/pending_messages.cache
+  type: sqlite
+  path: data/pending_messages.db
 
 log:
   path: logs/gateway.log

@@ -16,6 +16,8 @@
 
 完成依赖安装和项目编译：
 
+`sudo apt install -y libsqlite3-dev sqlite3`
+
 `cmake -S . -B ~/linux-iot-edge-gateway-build`
 
 `cmake --build ~/linux-iot-edge-gateway-build --parallel`
@@ -73,6 +75,18 @@
 `sudo systemctl restart linux-iot-edge-gateway`
 
 默认生产配置启用 MQTT，关闭 TCP。需要 TCP 双通道上报时，将 `tcp.enabled` 改为 `true`，并配置服务端地址和端口。
+
+默认缓存配置为 `cache.type: sqlite`，数据库位于 `/var/lib/linux-iot-edge-gateway/pending_messages.db`。查看待补传记录：
+
+`sudo sqlite3 /var/lib/linux-iot-edge-gateway/pending_messages.db 'SELECT id, topic, created_at FROM pending_messages ORDER BY id;'`
+
+从旧文件缓存升级时，应先停止服务再执行迁移：
+
+`sudo systemctl stop linux-iot-edge-gateway`
+
+`sudo python3 scripts/migrate_file_cache.py /var/lib/linux-iot-edge-gateway/pending_messages.cache /var/lib/linux-iot-edge-gateway/pending_messages.db`
+
+迁移成功后原文件会保留为 `.migrated` 备份，确认数据库内容后再启动服务。
 
 ## 6. 优雅退出
 

@@ -17,7 +17,8 @@ tcp:
   port: 9000
 
 cache:
-  path: /var/lib/linux-iot-edge-gateway/pending_messages.cache
+  type: sqlite
+  path: /var/lib/linux-iot-edge-gateway/pending_messages.db
 
 log:
   path: /var/log/linux-iot-edge-gateway/gateway.log

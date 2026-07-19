@@ -58,7 +58,8 @@ tcp:
   host: 127.0.0.1
   port: 9000
 cache:
-  path: ${RUNTIME_DIR}/pending.cache
+  type: sqlite
+  path: ${RUNTIME_DIR}/pending.db
 log:
   path: ${RUNTIME_DIR}/gateway.log
   level: DEBUG

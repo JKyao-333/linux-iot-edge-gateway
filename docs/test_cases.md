@@ -21,7 +21,7 @@
 
 仅运行 CTest：`ctest --test-dir ~/linux-iot-edge-gateway-build --output-on-failure`
 
-通过标准：20 个 CTest、串口到 MQTT 端到端测试和 TCP smoke test 全部通过。
+通过标准：23 个 CTest、串口到 MQTT 端到端测试、TCP smoke test 和缓存迁移测试全部通过。
 ## 4. C++ 测试矩阵
 
 | 编号 | 测试目标 | 验证内容 |
@@ -46,6 +46,9 @@
 | TC-018 | cache_replay_test | 缓存恢复补传 |
 | TC-019 | gateway_config_test | 正常 YAML 配置加载与字段检查 |
 | TC-020 | gateway_config_invalid_test | 非法端口、波特率和 YAML 格式拒绝 |
+| TC-021 | shutdown_signal_test | SIGINT/SIGTERM 退出标志 |
+| TC-022 | sqlite_cache_test | SQLite FIFO 追加、读取与队首删除 |
+| TC-023 | sqlite_cache_persistence_test | 进程重启后的缓存持久化与顺序 |
 ## 5. 端到端与故障测试
 
 | 编号 | 测试场景 | 预期结果 |
@@ -57,7 +60,7 @@
 | FT-003 | 启动时串口不存在 | 每 2 秒重试且进程不退出 |
 | FT-004 | 运行中串口断开再恢复 | 自动重连并继续接收数据 |
 | FT-005 | MQTT Broker 离线 | 发布失败消息写入本地缓存 |
-| FT-006 | MQTT Broker 恢复 | 缓存消息补传并从文件删除 |
+| FT-006 | MQTT Broker 恢复 | SQLite 队列按顺序补传并删除已确认消息 |
 
 ## 6. 串口端到端测试
 
@@ -76,11 +79,12 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 
 ## 7. 阶段验收标准
 
-- 20 个 CTest 全部通过。
+- 23 个 CTest 全部通过。
 - 串口到 MQTT smoke test 通过。
 - 半包、粘包和异常帧处理正确。
 - 串口断开后能够自动重连。
 - MQTT 离线数据能够缓存和补传。
+- 旧文件缓存能够事务化迁移到 SQLite。
 - 一条 Shell 命令能够完成构建与测试。
 ## 8. TCP 上报测试
 

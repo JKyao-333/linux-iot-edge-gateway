@@ -25,7 +25,8 @@ struct TcpConfig {
 };
 
 struct CacheConfig {
-    std::string path = "data/pending_messages.cache";
+    std::string type = "sqlite";
+    std::string path = "data/pending_messages.db";
 };
 
 struct LogConfig {

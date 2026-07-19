@@ -6,9 +6,9 @@ namespace mqtt {
 
 ReliablePublisher::ReliablePublisher(
     MqttClient& mqtt_client,
-    cache::FileCache& file_cache)
+    cache::MessageCache& message_cache)
     : mqtt_client_(mqtt_client),
-      file_cache_(file_cache) {}
+      message_cache_(message_cache) {}
 
 PublishResult ReliablePublisher::publish(
     const std::string& topic,
@@ -18,7 +18,7 @@ PublishResult ReliablePublisher::publish(
         return PublishResult::Published;
     }
 
-    if (file_cache_.append(topic, payload)) {
+    if (message_cache_.append(topic, payload)) {
         std::cout << "[WARN] mqtt unavailable, message cached"
                   << ", topic=" << topic << std::endl;
 
@@ -32,10 +32,10 @@ PublishResult ReliablePublisher::publish(
 }
 
 std::size_t ReliablePublisher::flush_cache() {
-    const auto messages = file_cache_.load_all();
+    const auto messages = message_cache_.load_all();
 
     if (messages.empty()) {
-            return 0;
+        return 0;
     }
 
     std::size_t published_count = 0;
@@ -61,12 +61,7 @@ std::size_t ReliablePublisher::flush_cache() {
         return 0;
     }
 
-    std::vector<cache::CachedMessage> remaining(
-        messages.begin() + published_count,
-        messages.end()
-    );
-
-    if (!file_cache_.replace_all(remaining)) {
+    if (!message_cache_.remove_first(published_count)) {
         std::cerr << "[ERROR] failed to update cache after replay"
                   << std::endl;
 
@@ -75,7 +70,8 @@ std::size_t ReliablePublisher::flush_cache() {
 
     std::cout << "[INFO] cache replay complete"
               << ", published=" << published_count
-              << ", remaining=" << remaining.size()
+              << ", remaining="
+              << messages.size() - published_count
               << std::endl;
 
     return published_count;

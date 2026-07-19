@@ -1,6 +1,6 @@
 #pragma once
 #include <cstddef>
-#include "cache/file_cache.h"
+#include "cache/message_cache.h"
 #include "mqtt/mqtt_client.h"
 
 #include <string>
@@ -17,17 +17,17 @@ class ReliablePublisher {
 public:
     ReliablePublisher(
         MqttClient& mqtt_client,
-        cache::FileCache& file_cache
+        cache::MessageCache& message_cache
     );
 
     PublishResult publish(
         const std::string& topic,
         const std::string& payload
     );
-std::size_t flush_cache();
+    std::size_t flush_cache();
 private:
     MqttClient& mqtt_client_;
-    cache::FileCache& file_cache_;
+    cache::MessageCache& message_cache_;
 };
 
 const char* to_string(PublishResult result);

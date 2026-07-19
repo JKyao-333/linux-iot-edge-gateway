@@ -5,6 +5,7 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(yaml-cpp REQUIRED)
+find_package(SQLite3 REQUIRED)
 find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(
@@ -90,6 +91,14 @@ target_link_libraries(app_core
     PUBLIC
         protocol
 )
+
+add_library(message_cache INTERFACE)
+
+target_include_directories(message_cache
+    INTERFACE
+        src
+)
+
 add_library(file_cache
     src/cache/file_cache.cpp
 )
@@ -98,6 +107,27 @@ target_include_directories(file_cache
     PUBLIC
         src
 )
+
+target_link_libraries(file_cache
+    PUBLIC
+        message_cache
+)
+
+add_library(sqlite_cache
+    src/cache/sqlite_cache.cpp
+)
+
+target_include_directories(sqlite_cache
+    PUBLIC
+        src
+)
+
+target_link_libraries(sqlite_cache
+    PUBLIC
+        message_cache
+        SQLite::SQLite3
+)
+
 add_library(reliable_publisher
     src/mqtt/reliable_publisher.cpp
 )
@@ -110,7 +140,7 @@ target_include_directories(reliable_publisher
 target_link_libraries(reliable_publisher
     PUBLIC
         mqtt_client
-        file_cache
+        message_cache
 )
 add_library(logger
     src/log/logger.cpp
@@ -134,6 +164,8 @@ target_link_libraries(edge_gateway
         mqtt_client
         logger
         reliable_publisher
+        file_cache
+        sqlite_cache
 )
 add_executable(mqtt_client_test
     tests/mqtt_client_test.cpp
@@ -166,6 +198,7 @@ add_executable(reliable_publisher_test
 target_link_libraries(reliable_publisher_test
     PRIVATE
         reliable_publisher
+        file_cache
 )
 add_executable(cache_replay_test
     tests/cache_replay_test.cpp
@@ -174,6 +207,7 @@ add_executable(cache_replay_test
 target_link_libraries(cache_replay_test
     PRIVATE
         reliable_publisher
+        sqlite_cache
 )
 
 add_executable(logger_test
@@ -445,6 +479,26 @@ register_gateway_test(
     shutdown_signal_test
     tests/shutdown_signal_test.cpp
     runtime_control
+)
+
+register_gateway_test(
+    sqlite_cache_test
+    tests/sqlite_cache_test.cpp
+    sqlite_cache
+)
+
+register_gateway_test(
+    sqlite_cache_persistence_test
+    tests/sqlite_cache_persistence_test.cpp
+    sqlite_cache
+)
+
+set_tests_properties(
+    sqlite_cache_test
+    sqlite_cache_persistence_test
+    PROPERTIES
+        LABELS "cache;sqlite"
+        TIMEOUT 5
 )
 
 set_tests_properties(

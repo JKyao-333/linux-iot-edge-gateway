@@ -1,22 +1,27 @@
 #pragma once
 
+#include "cache/message_cache.h"
+
+#include <cstddef>
 #include <string>
-#include <vector>
 
 namespace cache {
 
-struct CachedMessage {
-    std::string topic;
-    std::string payload;
-};
-
-class FileCache {
+class FileCache : public MessageCache {
 public:
     explicit FileCache(std::string path);
 
-    bool append(const std::string& topic, const std::string& payload);
-    std::vector<CachedMessage> load_all() const;
+    bool append(
+        const std::string& topic,
+        const std::string& payload
+    ) override;
+
+    std::vector<CachedMessage> load_all() const override;
+
+    bool remove_first(std::size_t count) override;
+
     bool replace_all(const std::vector<CachedMessage>& messages);
+
 private:
     std::string path_;
 };
