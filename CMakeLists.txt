@@ -5,6 +5,14 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(yaml-cpp REQUIRED)
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(
+    MOSQUITTO
+    REQUIRED
+    IMPORTED_TARGET
+    libmosquitto
+)
 add_library(protocol
     src/protocol/crc16.cpp
     src/protocol/frame_parser.cpp
@@ -44,6 +52,12 @@ target_include_directories(mqtt_client
     PUBLIC
         src
 )
+target_link_libraries(mqtt_client
+    PUBLIC
+        PkgConfig::MOSQUITTO
+)
+
+
 add_library(tcp_client
     src/tcp/tcp_client.cpp
 )

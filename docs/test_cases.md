@@ -150,7 +150,7 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 - 网关成功解析协议帧
 - MQTT 订阅端收到传感器 JSON
 - TCP 服务端收到相同的传感器 JSON
-- 网关输出 `mqtt publish ok`
+- 网关输出 `MQTT publish acknowledged`
 - 网关输出 `TCP send ok`
 ## 9. YAML 配置测试
 

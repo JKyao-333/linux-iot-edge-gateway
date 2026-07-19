@@ -95,7 +95,19 @@ if ! grep -Fq "serial opened" "${GATEWAY_LOG}"; then
     cat "${GATEWAY_LOG}"
     exit 1
 fi
+for _ in {1..30}; do
+    if grep -Fq "MQTT connected" "${GATEWAY_LOG}"; then
+        break
+    fi
 
+    sleep 0.1
+done
+
+if ! grep -Fq "MQTT connected" "${GATEWAY_LOG}"; then
+    echo "[ERROR] gateway did not connect to MQTT"
+    cat "${GATEWAY_LOG}"
+    exit 1
+fi
 echo "[INFO] sending one frame in two parts"
 
 python3 \
@@ -110,7 +122,7 @@ if ! grep -Fq "[sensor] parsed data" "${GATEWAY_LOG}"; then
     exit 1
 fi
 
-if ! grep -Fq "mqtt publish ok" "${GATEWAY_LOG}"; then
+if ! grep -Fq "MQTT publish acknowledged" "${GATEWAY_LOG}"; then
     echo "[ERROR] MQTT message was not published"
     cat "${GATEWAY_LOG}"
     exit 1

@@ -100,12 +100,14 @@ MQTT Topic：
 - socat
 - Mosquitto
 - mosquitto-clients
+- libmosquitto-dev
+- pkg-config
 - yaml-cpp
 Ubuntu 安装命令：
 
 `sudo apt update`
 
-`sudo apt install -y build-essential cmake git python3 python3-pip socat mosquitto mosquitto-clients libyaml-cpp-dev`
+`sudo apt install -y build-essential cmake git python3 python3-pip socat mosquitto mosquitto-clients libmosquitto-dev pkg-config libyaml-cpp-dev`
 安装 pyserial：
 
 `python3 -m pip install pyserial`
@@ -235,7 +237,7 @@ Ubuntu 安装命令：
 
 当前自动化测试结果：
 
-- CTest：18/18 通过
+- CTest：20/20 通过
 - CRC、半包、粘包和异常帧测试通过
 - 数据解析、清洗和 JSON 测试通过
 - MQTT 发布、离线缓存和补传测试通过
@@ -253,10 +255,9 @@ Ubuntu 安装命令：
 
 ## 当前实现说明
 
-当前 MQTT 客户端通过 `mosquitto_pub` 子进程发布消息，适合快速验证完整数据链路。
+当前 MQTT 客户端基于 `libmosquitto` 实现原生长连接，使用独立网络循环处理连接状态和消息回调。
 
-后续可替换为 Eclipse Paho 或 libmosquitto，实现长连接、QoS 回调和更完整的连接状态管理。
-
+传感器消息采用 QoS 1 发布，网关等待 Broker 返回 PUBACK 后才确认发送成功；连接中断时自动重连，离线消息写入本地文件缓存，连接恢复后按原顺序补传。
 ## 后续计划
 
 - 将文件缓存升级为 SQLite

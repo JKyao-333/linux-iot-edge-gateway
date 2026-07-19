@@ -88,7 +88,7 @@ ReliablePublisher
 - `src/mqtt/reliable_publisher.h`
 - `src/mqtt/reliable_publisher.cpp`
 
-MqttClient 负责调用本机 `mosquitto_pub` 发布消息。
+MqttClient 基于 `libmosquitto` 维护原生 MQTT 长连接，使用独立网络循环处理连接、断开和发布回调。消息采用 QoS 1 发布，收到 Broker 的 PUBACK 后才返回成功，并在连接断开后自动重连。
 
 ReliablePublisher 负责：
 
@@ -208,12 +208,12 @@ ReliablePublisher 负责：
 
 ## 7. 当前边界与后续扩展
 
-当前版本使用 `mosquitto_pub` 子进程完成 MQTT 发布，便于快速验证链路。
+当前版本已经使用 `libmosquitto` 实现原生 MQTT 长连接、QoS 1 发布确认和自动重连。ReliablePublisher 在发布失败时将消息写入本地缓存，并在 Broker 恢复后按顺序补传。
 
 后续可扩展：
 
-- 接入 Eclipse Paho 或 libmosquitto
-- 抽象 Publisher 接口
+- 抽象统一 Publisher 接口
+- 增加 MQTT 用户认证和 TLS 加密
 - 将文件缓存升级为 SQLite
 - 增加多串口和多设备并发
 - 增加 systemd 服务和交叉编译支持
