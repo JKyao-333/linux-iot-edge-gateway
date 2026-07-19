@@ -518,6 +518,18 @@ register_gateway_test(
     sqlite_cache
 )
 
+register_gateway_test(
+    byte_ring_buffer_test
+    tests/byte_ring_buffer_test.cpp
+    protocol
+)
+
+register_gateway_test(
+    frame_parser_ring_buffer_test
+    tests/frame_parser_ring_buffer_test.cpp
+    protocol
+)
+
 set_tests_properties(
     sqlite_cache_test
     sqlite_cache_persistence_test

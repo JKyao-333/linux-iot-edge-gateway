@@ -426,6 +426,17 @@ void run_serial_worker(
             );
         }
 
+        const std::size_t overflow_byte_count =
+            parser.take_overflow_byte_count();
+
+        if (overflow_byte_count > 0) {
+            logger.error(
+                "protocol",
+                "ring buffer overflow, dropped_bytes="
+                    + std::to_string(overflow_byte_count)
+            );
+        }
+
         for (const auto& frame : frames) {
             handle_frame(
                 frame,

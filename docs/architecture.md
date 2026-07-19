@@ -52,6 +52,7 @@ ReliablePublisher
 - `src/protocol/frame.h`
 - `src/protocol/crc16.h`
 - `src/protocol/crc16.cpp`
+- `src/protocol/byte_ring_buffer.h`
 - `src/protocol/frame_parser.h`
 - `src/protocol/frame_parser.cpp`
 
@@ -59,7 +60,8 @@ ReliablePublisher
 
 - 定义协议帧结构
 - 实现 CRC16-Modbus
-- 缓存未完成字节
+- 使用 256 字节固定容量环形缓冲区缓存未完成字节
+- 通过移动读指针消费数据，避免线性缓冲区反复 `erase` 和内存搬移
 - 处理半包和粘包
 - 过滤 CRC 错误帧
 - 检测非法 Payload 长度
@@ -170,7 +172,7 @@ ReliablePublisher 负责：
 `main.cpp` 只负责使用已经校验通过的配置，避免在业务流程中散落硬编码参数。
 ## 4. 运行模型
 
-当前网关采用单进程、多线程运行模型。主线程创建并共享 MQTT、TCP 和缓存发布组件，负责周期性补传缓存及进程退出协调；每个串口由一个独立工作线程负责打开、读取、解析和断线重连。每个工作线程拥有自己的文件描述符和 `FrameParser`，因此一路串口断线不会阻塞其他设备的数据接入。共享发布通道使用互斥锁保护。
+当前网关采用单进程、多线程运行模型。主线程创建并共享 MQTT、TCP 和缓存发布组件，负责周期性补传缓存及进程退出协调；每个串口由一个独立工作线程负责打开、读取、解析和断线重连。每个工作线程拥有自己的文件描述符、`FrameParser` 和环形缓冲区，因此一路串口断线不会阻塞其他设备的数据接入。共享发布通道使用互斥锁保护。
 
 串口配置：
 
