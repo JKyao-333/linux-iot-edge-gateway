@@ -14,7 +14,7 @@ jobs:
     name: Ubuntu native tests
     runs-on: ubuntu-22.04
     env:
-      BUILD_DIR: ${{ runner.temp }}/native-build
+      BUILD_DIR: /tmp/linux-iot-edge-gateway-build
 
     steps:
       - name: Check out source
