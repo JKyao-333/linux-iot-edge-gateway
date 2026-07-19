@@ -1,0 +1,50 @@
+#pragma once
+
+#include <cstdint>
+#include <string>
+
+namespace config {
+
+struct SerialConfig {
+    std::string device = "/tmp/tty_gateway";
+    int baud_rate = 115200;
+    int reconnect_interval_seconds = 2;
+};
+
+struct MqttConfig {
+    std::string host = "localhost";
+    std::uint16_t port = 1883;
+    std::string topic_prefix = "sensor";
+    int cache_retry_interval_seconds = 5;
+};
+
+struct TcpConfig {
+    bool enabled = true;
+    std::string host = "127.0.0.1";
+    std::uint16_t port = 9000;
+};
+
+struct CacheConfig {
+    std::string path = "data/pending_messages.cache";
+};
+
+struct LogConfig {
+    std::string path = "logs/gateway.log";
+    std::string level = "DEBUG";
+};
+
+struct GatewayConfig {
+    SerialConfig serial;
+    MqttConfig mqtt;
+    TcpConfig tcp;
+    CacheConfig cache;
+    LogConfig log;
+};
+
+bool load_gateway_config(
+    const std::string& file_path,
+    GatewayConfig& gateway_config,
+    std::string& error_message
+);
+
+}  // namespace config

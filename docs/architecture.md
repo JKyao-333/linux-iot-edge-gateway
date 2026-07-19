@@ -34,8 +34,7 @@ ReliablePublisher
 ### 3.1 main.cpp
 
 应用入口和主控制循环，负责：
-
-- 读取串口设备参数
+- 加载 YAML 配置并支持命令行覆盖串口设备
 - 打开和配置串口
 - 串口断开检测与自动重连
 - 将字节流送入 FrameParser
@@ -127,6 +126,24 @@ ReliablePublisher 负责：
 
 日志同时输出到终端和 `logs/gateway.log`，每条记录包含时间、级别、模块和消息。
 
+### 3.7 config
+
+文件：
+
+- `src/config/gateway_config.h`
+- `src/config/gateway_config.cpp`
+- `config/gateway.yaml`
+
+职责：
+
+- 使用 yaml-cpp 解析 YAML 配置文件
+- 将配置转换为强类型 `GatewayConfig` 结构体
+- 为各配置项提供默认值
+- 检查串口波特率、网络端口和时间间隔
+- 检查日志级别和必要字符串
+- 配置无效时阻止网关启动并输出错误原因
+
+`main.cpp` 只负责使用已经校验通过的配置，避免在业务流程中散落硬编码参数。
 ## 4. 运行模型
 
 当前网关采用单进程、单线程同步循环。
@@ -141,11 +158,14 @@ ReliablePublisher 负责：
 - 原始模式：raw
 
 主要时间参数：
+主要运行参数由 `config/gateway.yaml` 提供，默认值包括：
 
-- 串口读取超时约 1 秒
+- 串口波特率 115200
 - 串口重连间隔 2 秒
 - MQTT 缓存补传检查间隔 5 秒
-
+- MQTT Broker 端口 1883
+- TCP Server 端口 9000
+- TCP 上报默认启用
 该模型结构简单，便于在嵌入式 Linux 设备上部署和调试。
 
 ## 5. 可靠性设计
@@ -194,7 +214,6 @@ ReliablePublisher 负责：
 
 - 接入 Eclipse Paho 或 libmosquitto
 - 抽象 Publisher 接口
-- 增加 YAML 配置加载
 - 将文件缓存升级为 SQLite
 - 增加多串口和多设备并发
 - 增加 systemd 服务和交叉编译支持

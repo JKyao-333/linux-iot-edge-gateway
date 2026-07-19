@@ -4,7 +4,7 @@ project(linux_iot_edge_gateway LANGUAGES CXX)
 enable_testing()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
+find_package(yaml-cpp REQUIRED)
 add_library(protocol
     src/protocol/crc16.cpp
     src/protocol/frame_parser.cpp
@@ -22,6 +22,19 @@ add_library(app_core
 target_include_directories(app_core
     PUBLIC
         src
+)
+add_library(gateway_config
+    src/config/gateway_config.cpp
+)
+
+target_include_directories(gateway_config
+    PUBLIC
+        src
+)
+
+target_link_libraries(gateway_config
+    PUBLIC
+        yaml-cpp
 )
 add_library(mqtt_client
     src/mqtt/mqtt_client.cpp
@@ -92,6 +105,7 @@ target_link_libraries(edge_gateway
         protocol
 	tcp_client
         app_core
+	gateway_config
         mqtt_client
         logger
         reliable_publisher
@@ -375,7 +389,32 @@ register_gateway_test(
     tests/cache_replay_test.cpp
     reliable_publisher
 )
+register_gateway_test(
+    gateway_config_test
+    tests/gateway_config_test.cpp
+    gateway_config
+)
 
+set_tests_properties(
+    gateway_config_test
+    PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        LABELS "config"
+        TIMEOUT 5
+)
+
+register_gateway_test(
+    gateway_config_invalid_test
+    tests/gateway_config_invalid_test.cpp
+    gateway_config
+)
+
+set_tests_properties(
+    gateway_config_invalid_test
+    PROPERTIES
+        LABELS "config"
+        TIMEOUT 5
+)
 set_tests_properties(
     mqtt_client_test
     cache_replay_test

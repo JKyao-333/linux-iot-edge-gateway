@@ -14,6 +14,7 @@
 #include "log/logger.h"
 #include <chrono>
 #include "tcp/tcp_client.h"
+#include "config/gateway_config.h"
 #include <thread>
 static bool configure_serial(int fd, speed_t baudrate) {
     termios tty{};
@@ -47,8 +48,33 @@ static bool configure_serial(int fd, speed_t baudrate) {
 
     return true;
 }
+
+static speed_t to_termios_baud_rate(
+    int baud_rate) {
+
+    switch (baud_rate) {
+        case 9600:
+            return B9600;
+
+        case 19200:
+            return B19200;
+
+        case 38400:
+            return B38400;
+
+        case 57600:
+            return B57600;
+
+        case 115200:
+            return B115200;
+
+        default:
+            return B115200;
+    }
+}
 static int open_serial_device(
     const std::string& device,
+    speed_t baud_rate,
     logging::Logger& logger
 ) {
     int fd = open(
@@ -65,7 +91,7 @@ static int open_serial_device(
         return -1;
     }
 
-    if (!configure_serial(fd, B115200)) {
+if (!configure_serial(fd, baud_rate)) {
         logger.error(
             "serial",
             "configure failed: " + device
@@ -118,11 +144,21 @@ static void print_frame(const protocol::Frame& frame) {
               << std::dec
               << std::endl;
 }
-static std::string build_mqtt_topic(const app::SensorData& sensor_data) {
-    return "sensor/" + std::to_string(static_cast<int>(sensor_data.device_id)) + "/data";
+static std::string build_mqtt_topic(
+    const std::string& topic_prefix,
+    const app::SensorData& sensor_data) {
+
+    return topic_prefix + "/"
+        + std::to_string(
+            static_cast<int>(sensor_data.device_id)
+        )
+        + "/data";
 }
+
 static void handle_frame(
     const protocol::Frame& frame,
+    const std::string& mqtt_topic_prefix,
+    bool tcp_enabled,
     mqtt::ReliablePublisher& publisher,
     tcp::TcpClient& tcp_client,
     logging::Logger& logger) {
@@ -139,9 +175,9 @@ static void handle_frame(
     "parsed data: " + json
 );
 
-        const std::string topic = build_mqtt_topic(sensor_data);
+        const std::string topic = build_mqtt_topic(mqtt_topic_prefix,sensor_data);
         publisher.publish(topic, json);
-           if (!tcp_client.send_json(json)) {
+           if (tcp_enabled && !tcp_client.send_json(json)) {
             logger.warn(
                 "tcp",
                 "TCP publish failed"
@@ -153,38 +189,97 @@ static void handle_frame(
     "invalid data: " + json
 );
     }
+
+}
+static logging::Level parse_log_level(
+    const std::string& level) {
+
+    if (level == "INFO") {
+        return logging::Level::Info;
+    }
+
+    if (level == "WARN") {
+        return logging::Level::Warn;
+    }
+
+    if (level == "ERROR") {
+        return logging::Level::Error;
+    }
+
+    return logging::Level::Debug;
 }
 int main(int argc, char* argv[]) {
-   logging::Logger logger(
-    "logs/gateway.log",
-    logging::Level::Debug
-);
+    const std::string config_path =
+        argc >= 2
+            ? argv[1]
+            : "config/gateway.yaml";
 
+    config::GatewayConfig gateway_config;
+    std::string config_error;
+
+    if (!config::load_gateway_config(
+            config_path,
+            gateway_config,
+            config_error)) {
+
+        std::cerr
+            << "load config failed: "
+            << config_error
+            << std::endl;
+
+        return 1;
+    }
+    logging::Logger logger(
+        gateway_config.log.path,
+        parse_log_level(
+            gateway_config.log.level
+        )
+    );
 logger.info(
     "app",
     "edge gateway starting"
 );
 
-    if (argc < 2) {
-        std::cerr << "Usage: edge_gateway <serial_device>" << std::endl;
-        std::cerr << "Example: ./edge_gateway /tmp/tty_gateway" << std::endl;
-        return 1;
-    }
 
-    std::string device = argv[1];
+    const std::string device =
+        argc >= 3
+            ? argv[2]
+            : gateway_config.serial.device;
+     const speed_t serial_baud_rate =
+        to_termios_baud_rate(
+            gateway_config.serial.baud_rate
+        );
+        const int serial_reconnect_seconds =
+        gateway_config.serial
+            .reconnect_interval_seconds;
+
+    const auto serial_reconnect_interval =
+        std::chrono::seconds(
+            serial_reconnect_seconds
+        );
+
+    const std::string reconnect_message =
+        "retrying in "
+        + std::to_string(
+            serial_reconnect_seconds
+        )
+        + " seconds";
     int fd = -1;
 
     while (fd < 0) {
-        fd = open_serial_device(device, logger);
-
+	fd = open_serial_device(
+            device,
+            serial_baud_rate,
+            logger
+        );
         if (fd < 0) {
             logger.warn(
                 "serial",
-                "retrying in 2 seconds"
+                reconnect_message
             );
 
             std::this_thread::sleep_for(
-                std::chrono::seconds(2)
+                serial_reconnect_interval
             );
         }
     }
@@ -198,9 +293,12 @@ logger.info(
     "waiting for raw bytes"
 );
     protocol::FrameParser parser;
-    mqtt::MqttClient mqtt_client("localhost", 1883);
+        mqtt::MqttClient mqtt_client(
+        gateway_config.mqtt.host,
+        gateway_config.mqtt.port
+    );
     cache::FileCache file_cache(
-    "data/pending_messages.cache"
+    gateway_config.cache.path
 );
 
 mqtt::ReliablePublisher publisher(
@@ -208,8 +306,8 @@ mqtt::ReliablePublisher publisher(
     file_cache
 );
 tcp::TcpClient tcp_client(
-    "127.0.0.1",
-    9000
+    gateway_config.tcp.host,
+        gateway_config.tcp.port
 );
 logger.info(
     "cache",
@@ -217,6 +315,11 @@ logger.info(
 );
 
 publisher.flush_cache();
+const auto cache_retry_interval =
+    std::chrono::seconds(
+        gateway_config.mqtt.cache_retry_interval_seconds
+    );
+
     unsigned char buffer[256];
 auto last_cache_retry =
     std::chrono::steady_clock::now();
@@ -240,15 +343,16 @@ auto last_cache_retry =
             while (fd < 0) {
                 logger.warn(
                     "serial",
-                    "connection lost, retrying in 2 seconds"
+		   "connection lost, " + reconnect_message
                 );
 
                 std::this_thread::sleep_for(
-                    std::chrono::seconds(2)
+                    serial_reconnect_interval
                 );
 
-                fd = open_serial_device(
+		fd = open_serial_device(
                     device,
+                    serial_baud_rate,
                     logger
                 );
             }
@@ -264,7 +368,7 @@ const auto now =
     std::chrono::steady_clock::now();
 
 if (now - last_cache_retry
-    >= std::chrono::seconds(5)) {
+    >= cache_retry_interval) {
 
     publisher.flush_cache();
     last_cache_retry = now;
@@ -300,6 +404,8 @@ if (length_error_count > 0) {
 	for (const auto& frame : frames) {
 handle_frame(
     frame,
+    gateway_config.mqtt.topic_prefix,
+    gateway_config.tcp.enabled,
     publisher,
     tcp_client,
     logger

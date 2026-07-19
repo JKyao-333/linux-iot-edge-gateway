@@ -75,7 +75,9 @@ echo "[INFO] starting edge gateway"
 
 (
     cd "${RUNTIME_DIR}"
-    "${GATEWAY_BIN}" "${GATEWAY_DEVICE}"
+    "${GATEWAY_BIN}" \
+        "${PROJECT_DIR}/config/gateway.yaml" \
+        "${GATEWAY_DEVICE}"
 ) >"${GATEWAY_LOG}" 2>&1 &
 
 GATEWAY_PID=$!

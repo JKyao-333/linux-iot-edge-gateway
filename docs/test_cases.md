@@ -21,8 +21,7 @@
 
 仅运行 CTest：`ctest --test-dir ~/linux-iot-edge-gateway-build --output-on-failure`
 
-通过标准：18 个 CTest 和串口到 MQTT 端到端测试全部通过。
-
+通过标准：20 个 CTest、串口到 MQTT 端到端测试和 TCP smoke test 全部通过。
 ## 4. C++ 测试矩阵
 
 | 编号 | 测试目标 | 验证内容 |
@@ -45,7 +44,8 @@
 | TC-016 | logger_test | 四级日志输出 |
 | TC-017 | mqtt_client_test | MQTT 消息发布 |
 | TC-018 | cache_replay_test | 缓存恢复补传 |
-
+| TC-019 | gateway_config_test | 正常 YAML 配置加载与字段检查 |
+| TC-020 | gateway_config_invalid_test | 非法端口、波特率和 YAML 格式拒绝 |
 ## 5. 端到端与故障测试
 
 | 编号 | 测试场景 | 预期结果 |
@@ -76,7 +76,7 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 
 ## 7. 阶段验收标准
 
-- 18 个 CTest 全部通过。
+- 20 个 CTest 全部通过。
 - 串口到 MQTT smoke test 通过。
 - 半包、粘包和异常帧处理正确。
 - 串口断开后能够自动重连。
@@ -152,3 +152,55 @@ Python 模拟器 -> 虚拟串口 -> termios -> FrameParser -> SensorData -> JSON
 - TCP 服务端收到相同的传感器 JSON
 - 网关输出 `mqtt publish ok`
 - 网关输出 `TCP send ok`
+## 9. YAML 配置测试
+
+仅运行配置测试：
+
+`ctest --test-dir ~/linux-iot-edge-gateway-build -R 'gateway_config.*test' --output-on-failure`
+
+### CFG-01：正常配置加载
+
+输入：
+
+- `config/gateway.yaml`
+
+验证内容：
+
+- 串口设备和波特率正确
+- MQTT 地址、端口和 Topic 前缀正确
+- TCP 开关、地址和端口正确
+- 缓存与日志路径正确
+- 时间间隔配置正确
+
+预期结果：
+
+- 配置加载成功
+- 所有字段与 YAML 内容一致
+
+### CFG-02：异常配置拒绝
+
+测试输入：
+
+- MQTT 端口为 `70000`
+- 串口波特率为 `12345`
+- YAML 语法格式错误
+
+预期结果：
+
+- 配置加载失败
+- 返回明确错误信息
+- 网关拒绝使用无效配置启动
+
+### CFG-03：运行时配置生效
+
+测试配置：
+
+- `mqtt.topic_prefix` 设置为 `lab`
+- `tcp.enabled` 设置为 `false`
+- `mqtt.cache_retry_interval_seconds` 设置为 `3`
+
+预期结果：
+
+- MQTT 数据发布到 `lab/16/data`
+- 不建立 TCP 连接
+- MQTT 发布与串口解析保持正常

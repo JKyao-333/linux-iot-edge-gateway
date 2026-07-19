@@ -6,16 +6,16 @@ serial:
   baud_rate: 115200
   reconnect_interval_seconds: 2
 
-protocol:
-  frame_header: "AA55"
-  max_payload_length: 64
-  sensor_command: 1
-
 mqtt:
   host: localhost
   port: 1883
   topic_prefix: sensor
   cache_retry_interval_seconds: 5
+
+tcp:
+  enabled: true
+  host: 127.0.0.1
+  port: 9000
 
 cache:
   path: data/pending_messages.cache

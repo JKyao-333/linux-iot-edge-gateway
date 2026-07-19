@@ -100,17 +100,50 @@ MQTT Topic：
 - socat
 - Mosquitto
 - mosquitto-clients
-
+- yaml-cpp
 Ubuntu 安装命令：
 
 `sudo apt update`
 
-`sudo apt install -y build-essential cmake git python3 python3-pip socat mosquitto mosquitto-clients`
-
+`sudo apt install -y build-essential cmake git python3 python3-pip socat mosquitto mosquitto-clients libyaml-cpp-dev`
 安装 pyserial：
 
 `python3 -m pip install pyserial`
+## YAML 配置
 
+网关运行参数统一保存在 `config/gateway.yaml` 中。
+
+主要配置项：
+
+| 配置项 | 说明 |
+|---|---|
+| `serial.device` | 串口设备路径 |
+| `serial.baud_rate` | 串口波特率 |
+| `serial.reconnect_interval_seconds` | 串口断线重连间隔 |
+| `mqtt.host` | MQTT Broker 地址 |
+| `mqtt.port` | MQTT Broker 端口 |
+| `mqtt.topic_prefix` | MQTT Topic 前缀 |
+| `mqtt.cache_retry_interval_seconds` | 离线缓存补传周期 |
+| `tcp.enabled` | 是否启用 TCP 上报 |
+| `tcp.host` | TCP Server 地址 |
+| `tcp.port` | TCP Server 端口 |
+| `cache.path` | MQTT 离线缓存文件路径 |
+| `log.path` | 网关日志文件路径 |
+| `log.level` | 最低日志级别 |
+
+程序启动格式：
+
+`edge_gateway [配置文件] [串口设备覆盖值]`
+
+使用默认配置启动：
+
+`~/linux-iot-edge-gateway-build/edge_gateway config/gateway.yaml`
+
+临时覆盖串口设备：
+
+`~/linux-iot-edge-gateway-build/edge_gateway config/gateway.yaml /tmp/tty_gateway`
+
+配置文件包含类型检查和范围检查。端口、波特率、重连周期或日志级别无效时，程序将输出错误并拒绝启动。
 ## 编译
 
 推荐将构建目录放在 WSL Linux 文件系统中，避免 Windows 挂载目录的时间戳和链接问题。
@@ -141,13 +174,13 @@ Ubuntu 安装命令：
 
 1. CMake 配置
 2. C++ 工程编译
-3. 18 个 CTest 测试
-4. 虚拟串口创建
-5. Python 半包发送
-6. 串口数据解析
-7. JSON 生成
+3. 20 个 CTest 测试
+4. YAML 正常配置与异常配置测试
+5. 虚拟串口创建
+6. Python 半包发送
+7. 串口协议解析与 JSON 生成
 8. MQTT 发布验证
-
+9. 原生 TCP 发布验证
 成功时最终输出：
 
 `[PASS] all smoke tests passed`
@@ -160,7 +193,7 @@ Ubuntu 安装命令：
 
 启动网关：
 
-`~/linux-iot-edge-gateway-build/edge_gateway /tmp/tty_gateway`
+`~/linux-iot-edge-gateway-build/`~/linux-iot-edge-gateway-build/edge_gateway config/gateway.yaml /tmp/tty_gateway`
 
 发送正常数据：
 
@@ -226,7 +259,6 @@ Ubuntu 安装命令：
 
 ## 后续计划
 
-- 增加 YAML 配置加载
 - 将文件缓存升级为 SQLite
 - 抽象统一 Publisher 接口
 - 增加多串口和多设备并发
