@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
@@ -24,6 +24,7 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             cmake \
+            iproute2 \
             libmosquitto-dev \
             libsqlite3-dev \
             libyaml-cpp-dev \
@@ -40,7 +41,28 @@ jobs:
         run: sudo service mosquitto start
 
       - name: Run native test suite
-        run: ./scripts/run_smoke_test.sh
+        shell: bash
+        run: |
+          set -o pipefail
+          ./scripts/run_smoke_test.sh 2>&1 | tee native-test.log
+          status=${PIPESTATUS[0]}
+          if (( status != 0 )); then
+            {
+              echo "## Native test failure"
+              echo '```text'
+              tail -n 120 native-test.log
+              echo '```'
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit "${status}"
+          fi
+
+      - name: Upload native test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-test-log
+          path: native-test.log
+          if-no-files-found: ignore
 
   aarch64-cross-build:
     name: ARM64 cross build
@@ -48,7 +70,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install cross-build tools
         run: |
@@ -69,7 +91,28 @@ jobs:
         env:
           AARCH64_TOOLS_ROOT: ${{ runner.temp }}/aarch64-tools
           AARCH64_BUILD_DIR: ${{ runner.temp }}/aarch64-build
-        run: ./scripts/build_aarch64.sh
+        shell: bash
+        run: |
+          set -o pipefail
+          ./scripts/build_aarch64.sh 2>&1 | tee arm64-build.log
+          status=${PIPESTATUS[0]}
+          if (( status != 0 )); then
+            {
+              echo "## ARM64 build failure"
+              echo '```text'
+              tail -n 120 arm64-build.log
+              echo '```'
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit "${status}"
+          fi
+
+      - name: Upload ARM64 build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-build-log
+          path: arm64-build.log
+          if-no-files-found: ignore
 
       - name: Upload ARM64 deployment package
         uses: actions/upload-artifact@v4

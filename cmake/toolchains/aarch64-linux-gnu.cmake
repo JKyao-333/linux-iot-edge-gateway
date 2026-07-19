@@ -11,6 +11,10 @@ set(
     "Directory containing extracted ARM64 development packages"
 )
 
+# CMake configures a nested project while probing the cross compiler. Keep the
+# dependency sysroot available inside that try_compile project as well.
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES AARCH64_SYSROOT)
+
 if(NOT AARCH64_SYSROOT AND DEFINED ENV{AARCH64_SYSROOT})
     set(AARCH64_SYSROOT "$ENV{AARCH64_SYSROOT}")
 endif()

@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Verify tag and project version
         run: ./scripts/verify_release_version.sh "${GITHUB_REF_NAME}"
