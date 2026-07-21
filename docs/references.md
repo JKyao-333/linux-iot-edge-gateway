@@ -24,11 +24,16 @@
 - Modbus 串行链路规范：[MODBUS over Serial Line Specification and Implementation Guide V1.02](https://www.modbus.org/docs/Modbus_over_serial_line_V1_02.pdf)
 - CRC16-Modbus 的多项式、初值和字节顺序以 Modbus 串行链路规范为准；项目测试向量见 `tests/crc16_test.cpp`。
 
-## 4. 相关开源工程
+## 4. 公开复现平台资料
+
+- [FIT IoT-LAB OpenM3 schematic](https://github.com/iot-lab/iot-lab/wiki/Docs/openm3-schematics.pdf)：OpenM3 兼容 STM32 节点的硬件资料。该节点已用于本项目公开复现验证。
+- [svrooij/smartmeter2mqtt](https://github.com/svrooij/smartmeter2mqtt)：Raspberry Pi ARM64、稳定串口设备路径和多通道部署方式的调研资料。Raspberry Pi 4 Model B + 64-bit Linux 已用于本项目公开复现验证。
+
+OpenM3 和 Raspberry Pi 4 是本项目公开复现验证平台，不等同于早期课题组历史验证设备。
+
+## 5. 技术调研与架构参考
 
 - [emqx/neuron](https://github.com/emqx/neuron)：工业协议南向接入、MQTT 北向连接和多架构边缘部署的架构参考。
 - [je-s/Serial2MqttGateway](https://github.com/je-s/Serial2MqttGateway)：串口设备识别、I/O 异常处理和设备 Topic 层级的实现参考。
-- [svrooij/smartmeter2mqtt](https://github.com/svrooij/smartmeter2mqtt)：Raspberry Pi ARM64、稳定串口设备路径以及 MQTT/TCP 多输出的复现环境参考。
-- [FIT IoT-LAB OpenM3 schematic](https://github.com/iot-lab/iot-lab/wiki/Docs/openm3-schematics.pdf)：STM32F103RxY Cortex-M3 参考硬件。
 
-这些项目用于技术调研和复现平台选择，不构成本项目硬件测试结果或性能数据来源。
+除上述公开复现平台资料外，其他开源项目仅用于技术调研、部署方式或架构参考。所有参考资料均不构成本项目吞吐量、时延、可用性或其他性能指标的来源。
