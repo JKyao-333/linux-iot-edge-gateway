@@ -14,6 +14,8 @@
 - 新增 Health Check 状态检查脚本。
 - 新增日志脱敏脚本。
 - 新增串口 replay、health check 和 logging 工程文档。
+- 优化日志脱敏脚本 dry-run 参数体验。
+- 新增工程验证工作流文档与轻量自检脚本，串联 smoke test、故障注入、环境采集、稳定性测试、串口 replay、health check 和日志脱敏归档流程。
 
 ## 1.0.1 - 2026-07-21
 

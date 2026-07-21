@@ -59,6 +59,8 @@ python3 scripts/sanitize_logs.py \
     --output artifacts/fault_injection_sanitized.log
 ```
 
+写入文件模式必须指定 `--output`，用于生成可归档的脱敏日志。
+
 默认处理以下内容：
 
 - IPv4 和 IPv6 地址
@@ -69,12 +71,11 @@ python3 scripts/sanitize_logs.py \
 
 对完整 JSON Lines，脚本先解析 JSON 并递归脱敏，输出仍保持逐行合法 JSON。`--append-note` 会增加普通文本注释，因此严格 JSON Lines 归档不应开启该参数。
 
-如需检查而不写文件：
+dry-run 模式适合快速检查脱敏效果，不写入输出文件，也不要求指定 `--output`：
 
 ```bash
 python3 scripts/sanitize_logs.py \
-    --input logs/sample_gateway.log \
-    --output artifacts/sample_sanitized.log \
+    --input artifacts/fault_injection_raw.log \
     --dry-run
 ```
 

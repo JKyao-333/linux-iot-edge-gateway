@@ -43,7 +43,10 @@ def parse_args():
         description="Sanitize gateway logs and validation reports."
     )
     parser.add_argument("--input", required=True)
-    parser.add_argument("--output", required=True)
+    parser.add_argument(
+        "--output",
+        help="Output file path. Required unless --dry-run is used.",
+    )
     parser.add_argument(
         "--redact-ip", action=argparse.BooleanOptionalAction, default=True
     )
@@ -178,8 +181,17 @@ class Sanitizer:
 
 def main():
     args = parse_args()
+
+    if not args.dry_run and not args.output:
+        print(
+            "[ERROR] --output is required unless --dry-run is used",
+            file=sys.stderr,
+        )
+        return 2
+    if args.dry_run and args.output:
+        print("[WARN] --output is ignored in dry-run mode", file=sys.stderr)
+
     input_path = Path(args.input).expanduser()
-    output_path = Path(args.output).expanduser()
 
     if not input_path.exists() or not input_path.is_file():
         print(
@@ -213,6 +225,7 @@ def main():
         sys.stdout.write(result)
         return 0
 
+    output_path = Path(args.output).expanduser()
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(result, encoding="utf-8")
