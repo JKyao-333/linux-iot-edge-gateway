@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-DEFAULT_ROOT="/mnt/d/Tools/linux-iot-edge-gateway"
+DEFAULT_ROOT="${HOME}/Tools/linux-iot-edge-gateway"
 TOOLS_ROOT="${1:-${AARCH64_TOOLS_ROOT:-${DEFAULT_ROOT}}}"
 SYSROOT="${TOOLS_ROOT}/aarch64-sysroot"
 PACKAGE_DIR="${TOOLS_ROOT}/aarch64-packages"

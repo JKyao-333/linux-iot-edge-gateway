@@ -121,17 +121,23 @@
 
 在 x86_64 Ubuntu / WSL2 开发机执行：
 
+ARM64 工具、sysroot 和部署产物默认保存到 `~/Tools/linux-iot-edge-gateway`。可通过环境变量覆盖：
+
+`export AARCH64_TOOLS_ROOT=/path/to/linux-iot-edge-gateway-tools`
+
+WSL 用户如需使用 D 盘，可显式设置为 `/mnt/d/Tools/linux-iot-edge-gateway`。
+
 `./scripts/setup_aarch64_sysroot.sh`
 
 `./scripts/build_aarch64.sh`
 
 默认部署包位于：
 
-`/mnt/d/Tools/linux-iot-edge-gateway/artifacts/linux-iot-edge-gateway-<version>-aarch64.tar.gz`
+`${AARCH64_TOOLS_ROOT:-$HOME/Tools/linux-iot-edge-gateway}/artifacts/linux-iot-edge-gateway-<version>-aarch64.tar.gz`
 
 对应的 SHA-256 校验文件位于：
 
-`/mnt/d/Tools/linux-iot-edge-gateway/artifacts/linux-iot-edge-gateway-<version>-aarch64.tar.gz.sha256`
+`${AARCH64_TOOLS_ROOT:-$HOME/Tools/linux-iot-edge-gateway}/artifacts/linux-iot-edge-gateway-<version>-aarch64.tar.gz.sha256`
 
 将部署包传到 ARM64 Ubuntu 22.04 设备后，先安装运行时依赖：
 

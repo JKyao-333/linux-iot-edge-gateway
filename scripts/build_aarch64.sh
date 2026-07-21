@@ -7,7 +7,7 @@ PROJECT_DIR="$(
     pwd
 )"
 
-DEFAULT_TOOLS_ROOT="/mnt/d/Tools/linux-iot-edge-gateway"
+DEFAULT_TOOLS_ROOT="${HOME}/Tools/linux-iot-edge-gateway"
 TOOLS_ROOT="${AARCH64_TOOLS_ROOT:-${DEFAULT_TOOLS_ROOT}}"
 SYSROOT="${AARCH64_SYSROOT:-${TOOLS_ROOT}/aarch64-sysroot}"
 BUILD_DIR="${AARCH64_BUILD_DIR:-${HOME}/linux-iot-edge-gateway-build-aarch64}"

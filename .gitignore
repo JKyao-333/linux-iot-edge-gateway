@@ -22,14 +22,35 @@ Testing/
 
 # Runtime cache
 /data/*
-!/data/.gitkeep
+!/data/README.md
+!/data/test_summary.md
+*.cache
+*.cache.tmp
+*.migrated
+*.tmp
 *.db
 *.db-wal
 *.db-shm
 
 # Runtime logs
 /logs/*
-!/logs/.gitkeep
+!/logs/README.md
+!/logs/test_summary.md
+*.log
+!/logs/sample_gateway.log
+
+# Local credentials and transport security material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+credentials/
+secrets/
 
 # Python generated files
 __pycache__/

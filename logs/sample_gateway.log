@@ -1,0 +1,6 @@
+2026-01-01 00:00:00.000 [INFO] [app] edge gateway starting
+2026-01-01 00:00:00.001 [INFO] [serial] serial opened: <serial-device>
+2026-01-01 00:00:01.002 [INFO] [sensor] parsed data: {"device_id":16,"sequence":1,"valid":true}
+2026-01-01 00:00:01.003 [INFO] [mqtt] publish acknowledged, topic=<topic>
+2026-01-01 00:00:02.004 [WARN] [serial] connection lost, retrying
+2026-01-01 00:00:04.005 [INFO] [serial] serial connection restored
