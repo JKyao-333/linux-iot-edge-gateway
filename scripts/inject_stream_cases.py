@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys
+import argparse
 import time
 import serial
 
@@ -45,50 +45,59 @@ def build_frame(device_id):
     ])
 
 
-def main():
-    if len(sys.argv) < 2:
-        print(
-            "Usage: python3 scripts/inject_stream_cases.py "
-            "<serial_device> [device_id]"
-        )
-        return 1
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Inject valid serial stream boundary cases."
+    )
+    parser.add_argument("serial_device")
+    parser.add_argument("device_id", nargs="?", default="0x10")
+    parser.add_argument(
+        "--mode",
+        choices=("normal", "half", "noise"),
+        default="half",
+    )
+    return parser.parse_args()
 
-    device = sys.argv[1]
-    device_id = int(sys.argv[2], 0) if len(sys.argv) >= 3 else 0x10
+
+def main():
+    arguments = parse_arguments()
+    device = arguments.serial_device
+    device_id = int(arguments.device_id, 0)
 
     if not 0 <= device_id <= 0xFF:
         print("device_id must be between 0 and 255")
         return 1
 
     good_frame = build_frame(device_id)
-    split_position = 6
-
-    first_part = good_frame[:split_position]
-    second_part = good_frame[split_position:]
-
     with serial.Serial(
         device,
         baudrate=115200,
         timeout=1
     ) as serial_port:
+        if arguments.mode == "normal":
+            serial_port.write(good_frame)
+            serial_port.flush()
+            print("TX normal frame: " + good_frame.hex(" ").upper())
+        elif arguments.mode == "noise":
+            noise = bytes([0x00, 0x13, 0xAA, 0x7E, 0x55])
+            serial_port.write(noise + good_frame)
+            serial_port.flush()
+            print(
+                "TX noise plus frame: "
+                + (noise + good_frame).hex(" ").upper()
+            )
+        else:
+            split_position = 6
+            first_part = good_frame[:split_position]
+            second_part = good_frame[split_position:]
 
-        serial_port.write(first_part)
-        serial_port.flush()
-
-        print(
-            "TX half part 1: "
-            + first_part.hex(" ").upper()
-        )
-
-        time.sleep(0.5)
-
-        serial_port.write(second_part)
-        serial_port.flush()
-
-        print(
-            "TX half part 2: "
-            + second_part.hex(" ").upper()
-        )
+            serial_port.write(first_part)
+            serial_port.flush()
+            print("TX half part 1: " + first_part.hex(" ").upper())
+            time.sleep(0.5)
+            serial_port.write(second_part)
+            serial_port.flush()
+            print("TX half part 2: " + second_part.hex(" ").upper())
 
     return 0
 

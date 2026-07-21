@@ -1,17 +1,38 @@
 #!/usr/bin/env python3
 
-import sys
+import argparse
 import time
 import serial
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Continuously send a valid sensor frame."
+    )
+    parser.add_argument("serial_device")
+    parser.add_argument("--rate-hz", type=float, default=1.0)
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=0,
+        help="Stop after this many frames; 0 means run continuously.",
+    )
+    return parser.parse_args()
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 scripts/mock_serial_sender.py <serial_device>")
-        print("Example: python3 scripts/mock_serial_sender.py /tmp/tty_stm32")
+    arguments = parse_arguments()
+
+    if arguments.rate_hz <= 0:
+        print("--rate-hz must be greater than zero")
         return 1
 
-    device = sys.argv[1]
+    if arguments.count < 0:
+        print("--count must not be negative")
+        return 1
+
+    device = arguments.serial_device
+    interval_seconds = 1.0 / arguments.rate_hz
     frame = bytes([
         0xAA, 0x55,
         0x0B,
@@ -28,15 +49,23 @@ def main():
     with serial.Serial(device, baudrate=115200, timeout=1) as ser:
         count = 0
 
-        while True:
+        while arguments.count == 0 or count < arguments.count:
             ser.write(frame)
             ser.flush()
 
             count += 1
-            print(f"TX frame #{count}: {frame.hex(' ').upper()}")
+            print(
+                f"TX frame #{count}: {frame.hex(' ').upper()}",
+                flush=True,
+            )
 
-            time.sleep(1)
+            time.sleep(interval_seconds)
+
+    return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print("\n[INFO] serial sender stopped")

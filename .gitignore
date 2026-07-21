@@ -39,6 +39,13 @@ Testing/
 *.log
 !/logs/sample_gateway.log
 
+# Local validation artifacts
+/artifacts/*
+!/artifacts/README.md
+stability_*/
+fault_injection_raw.log
+env_report.md
+
 # Local credentials and transport security material
 .env
 .env.*
