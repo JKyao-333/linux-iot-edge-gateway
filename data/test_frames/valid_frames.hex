@@ -1,0 +1,4 @@
+# Valid CRC16-Modbus sensor frames generated from synthetic values.
+AA 55 0B 01 10 00 FD 02 60 01 2C 0E 74 00 00 01 4D 58
+AA 55 0B 01 11 00 D7 02 26 01 A4 0E 42 00 00 02 44 CA
+AA 55 0B 01 12 01 2D 02 D5 00 B4 0E EC 01 00 03 8C 38

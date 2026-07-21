@@ -24,6 +24,9 @@ Testing/
 /data/*
 !/data/README.md
 !/data/test_summary.md
+!/data/test_frames/
+!/data/test_frames/README.md
+!/data/test_frames/*.hex
 *.cache
 *.cache.tmp
 *.migrated
@@ -45,6 +48,10 @@ Testing/
 stability_*/
 fault_injection_raw.log
 env_report.md
+/artifacts/**/health_check.md
+/artifacts/**/health_check.json
+/artifacts/**/serial_replay_summary.md
+/artifacts/**/*_sanitized.log
 
 # Local credentials and transport security material
 .env

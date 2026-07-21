@@ -1,0 +1,5 @@
+# Replay with --split-bytes to exercise partial reads.
+AA 55 0B 01 10 00 FD 02 60 01 2C 0E 74 00 00 01 4D 58
+
+# Replay both lines at a high rate to exercise consecutive-frame parsing.
+AA 55 0B 01 11 00 D7 02 26 01 A4 0E 42 00 00 02 44 CA

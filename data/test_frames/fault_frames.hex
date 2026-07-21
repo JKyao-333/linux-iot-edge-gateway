@@ -1,0 +1,8 @@
+# CRC error: the final two bytes are intentionally invalid.
+AA 55 0B 01 10 00 FD 02 60 01 2C 0E 74 00 00 01 00 00
+
+# Invalid payload length. The parser should reject 0xFF.
+AA 55 FF 01 10 00 00
+
+# Prefix noise followed by one valid frame.
+DE AD BE EF AA 55 0B 01 10 00 FD 02 60 01 2C 0E 74 00 00 01 4D 58
