@@ -52,6 +52,7 @@ private:
     std::atomic<bool> cache_ready_{false};
     std::atomic<bool> serial_workers_started_{false};
     std::atomic<std::size_t> serial_worker_count_{0};
+    std::atomic<std::size_t> input_device_count_{0};
     std::atomic<std::size_t> device_online_count_{0};
     std::atomic<std::size_t> device_offline_count_{0};
     mutable std::mutex device_statuses_mutex_;

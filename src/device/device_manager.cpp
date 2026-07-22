@@ -74,7 +74,12 @@ void DeviceManager::run_device(DeviceInterface& input) {
             started = input.start(error);
             if (!started) {
                 if (error_handler_) {
-                    error_handler_(input.get_device_status().protocol, ReadCode::TransportError, error);
+                    error_handler_(
+                        input.get_device_status().protocol,
+                        ReadCode::TransportError,
+                        error,
+                        {}
+                    );
                 }
                 std::this_thread::sleep_for(reconnect_interval_);
                 continue;
@@ -82,21 +87,28 @@ void DeviceManager::run_device(DeviceInterface& input) {
         }
 
         DeviceReadResult result = input.read(std::chrono::milliseconds(250));
+        const ProtocolType protocol = input.get_device_status().protocol;
         if (result.code == ReadCode::Data && result.data.has_value()) {
             if (data_handler_) {
-                data_handler_(*result.data, input.get_device_status().protocol);
+                data_handler_(*result.data, protocol);
             }
-        } else if (result.code == ReadCode::ProtocolError
-                   || (result.code == ReadCode::Timeout
-                       && input.get_device_status().protocol
-                           == ProtocolType::ModbusRtu)) {
-            if (error_handler_) {
-                error_handler_(input.get_device_status().protocol, result.code, result.error);
-            }
-        } else if (result.code == ReadCode::TransportError) {
-            if (error_handler_) {
-                error_handler_(input.get_device_status().protocol, result.code, result.error);
-            }
+        }
+
+        const bool report_error = !result.error_stats.empty()
+            || result.code == ReadCode::ProtocolError
+            || result.code == ReadCode::TransportError
+            || (result.code == ReadCode::Timeout
+                && protocol == ProtocolType::ModbusRtu);
+        if (report_error && error_handler_) {
+            error_handler_(
+                protocol,
+                result.code,
+                result.error,
+                result.error_stats
+            );
+        }
+
+        if (result.code == ReadCode::TransportError) {
             input.stop();
             started = false;
         }

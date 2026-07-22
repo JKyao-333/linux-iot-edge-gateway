@@ -214,10 +214,10 @@ int main() {
 
     if (!expect_load_failure(
             test_path,
-            "must not be empty")) {
+            "at least one input source must be enabled")) {
 
         std::cerr
-            << "empty serial device list was not rejected"
+            << "configuration without input sources was not rejected"
             << std::endl;
 
         std::remove(test_path.c_str());

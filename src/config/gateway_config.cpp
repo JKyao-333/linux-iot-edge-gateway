@@ -386,13 +386,6 @@ bool load_gateway_config(
                 uppercase(gateway_config.log.level);
         }
 
-        if (gateway_config.serial.devices.empty()) {
-            error_message =
-                "serial.devices must not be empty";
-
-            return false;
-        }
-
         std::set<std::string> unique_serial_devices;
 
         for (const auto& device
@@ -454,6 +447,13 @@ bool load_gateway_config(
 
         if (gateway_config.can.heartbeat_timeout_seconds < 1) {
             error_message = "can.heartbeat_timeout_seconds must be positive";
+            return false;
+        }
+
+        if (gateway_config.serial.devices.empty()
+            && !gateway_config.modbus.enabled
+            && !gateway_config.can.enabled) {
+            error_message = "at least one input source must be enabled";
             return false;
         }
 

@@ -25,7 +25,7 @@ UartDevice::UartDevice(std::string path, int baud_rate)
 
 bool UartDevice::start(std::string& error_message) {
     if (!port_.open_port(path_, baud_rate_, error_message)) {
-        record_error();
+        record_errors();
         return false;
     }
     parser_.reset();
@@ -51,7 +51,7 @@ DeviceReadResult UartDevice::read(std::chrono::milliseconds timeout) {
     std::string error;
     const int received = port_.read_some(buffer, sizeof(buffer), timeout, error);
     if (received < 0) {
-        record_error();
+        record_errors();
         stop();
         return {ReadCode::TransportError, std::nullopt, error};
     }
@@ -60,25 +60,32 @@ DeviceReadResult UartDevice::read(std::chrono::milliseconds timeout) {
     }
 
     const auto frames = parser_.feed(buffer, static_cast<std::size_t>(received));
-    const std::size_t errors = parser_.take_crc_error_count()
-        + parser_.take_length_error_count()
-        + parser_.take_overflow_byte_count();
-    if (errors > 0) {
-        record_error();
-    }
+    ProtocolErrorStats error_stats;
+    error_stats.crc_errors = parser_.take_crc_error_count();
+    error_stats.length_errors = parser_.take_length_error_count();
+    error_stats.overflow_bytes = parser_.take_overflow_byte_count();
 
     for (const auto& frame : frames) {
         app::SensorData data;
         if (app::parse_sensor_data(frame, data)) {
             pending_.push_back(std::move(data));
         } else {
-            record_error();
+            ++error_stats.generic_errors;
         }
     }
 
+    if (!error_stats.empty()) {
+        record_errors(error_stats.total());
+    }
+
     if (pending_.empty()) {
-        if (errors > 0) {
-            return {ReadCode::ProtocolError, std::nullopt, "UART frame rejected"};
+        if (!error_stats.empty()) {
+            return {
+                ReadCode::ProtocolError,
+                std::nullopt,
+                "UART frame rejected",
+                error_stats
+            };
         }
         return {};
     }
@@ -91,7 +98,12 @@ DeviceReadResult UartDevice::read(std::chrono::milliseconds timeout) {
         status_.online = true;
         status_.last_update_unix_seconds = unix_seconds();
     }
-    return {ReadCode::Data, data, {}};
+    return {
+        ReadCode::Data,
+        data,
+        error_stats.empty() ? std::string{} : "UART frame rejected",
+        error_stats
+    };
 }
 
 DeviceStatus UartDevice::get_device_status() const {
@@ -99,9 +111,9 @@ DeviceStatus UartDevice::get_device_status() const {
     return status_;
 }
 
-void UartDevice::record_error() {
+void UartDevice::record_errors(std::size_t count) {
     std::lock_guard<std::mutex> lock(status_mutex_);
-    ++status_.error_count;
+    status_.error_count += count;
 }
 
 }  // namespace device

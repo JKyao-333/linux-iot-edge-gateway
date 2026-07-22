@@ -605,6 +605,12 @@ register_gateway_test(
 )
 
 register_gateway_test(
+    gateway_config_input_sources_test
+    tests/gateway_config_input_sources_test.cpp
+    gateway_config
+)
+
+register_gateway_test(
     runtime_observability_test
     tests/runtime_observability_test.cpp
     runtime_observability
@@ -626,6 +632,7 @@ set_tests_properties(
 
 set_tests_properties(
     gateway_config_invalid_test
+    gateway_config_input_sources_test
     PROPERTIES
         LABELS "config"
         TIMEOUT 5
@@ -685,11 +692,18 @@ register_gateway_test(
     device_input
 )
 
+register_gateway_test(
+    uart_device_error_stats_test
+    tests/uart_device_error_stats_test.cpp
+    device_input
+)
+
 set_tests_properties(
     modbus_rtu_test
     can_parser_test
     modbus_device_timeout_test
     device_manager_test
+    uart_device_error_stats_test
     PROPERTIES
         LABELS "device;protocol"
         TIMEOUT 5

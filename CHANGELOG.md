@@ -11,6 +11,10 @@
 - 新增 Linux SocketCAN 输入、CAN ID/DLC/Payload 解析和 `vcan0` 集成测试路径。
 - HTTP Health 与 Prometheus Metrics 增加设备在线、离线及协议错误状态。
 - 新增三协议集成测试脚本和 Modbus、SocketCAN 工程文档。
+- 移除主程序中已由 `UartDevice` 接管的旧串口工作循环，保持单一 UART 接入路径。
+- 修复 UART 同批次错误帧与合法帧并存时协议错误统计丢失的问题。
+- 配置校验支持 UART-only、Modbus-only、CAN-only 和混合输入，并拒绝未启用任何输入源的配置。
+- HTTP 状态增加输入设备总数，并明确串口工作线程字段只统计 UART 输入。
 
 ### 可观测性与本地复现
 

@@ -14,187 +14,21 @@
 #include "http/http_server.h"
 #include "mqtt/mqtt_client.h"
 #include "mqtt/reliable_publisher.h"
-#include "protocol/frame_parser.h"
 #include "publisher/publisher_group.h"
 #include "publisher/tcp_publisher.h"
 #include "tcp/tcp_client.h"
 #include "version.h"
 
-#include <cerrno>
 #include <chrono>
 #include <cstdint>
-#include <cstring>
-#include <fcntl.h>
-#include <iomanip>
 #include <iostream>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <termios.h>
 #include <thread>
-#include <unistd.h>
 #include <utility>
 #include <vector>
 
 namespace {
-
-std::mutex console_mutex;
-
-bool configure_serial(int fd, speed_t baud_rate) {
-    termios tty{};
-
-    if (tcgetattr(fd, &tty) != 0) {
-        std::cerr
-            << "tcgetattr failed: "
-            << std::strerror(errno)
-            << std::endl;
-
-        return false;
-    }
-
-    cfmakeraw(&tty);
-    cfsetispeed(&tty, baud_rate);
-    cfsetospeed(&tty, baud_rate);
-
-    tty.c_cflag |= CLOCAL;
-    tty.c_cflag |= CREAD;
-    tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |= CS8;
-    tty.c_cflag &= ~PARENB;
-    tty.c_cflag &= ~CSTOPB;
-    tty.c_cflag &= ~CRTSCTS;
-
-    tty.c_cc[VMIN] = 0;
-    tty.c_cc[VTIME] = 10;
-
-    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
-        std::cerr
-            << "tcsetattr failed: "
-            << std::strerror(errno)
-            << std::endl;
-
-        return false;
-    }
-
-    return true;
-}
-
-speed_t to_termios_baud_rate(int baud_rate) {
-    switch (baud_rate) {
-        case 9600:
-            return B9600;
-        case 19200:
-            return B19200;
-        case 38400:
-            return B38400;
-        case 57600:
-            return B57600;
-        case 115200:
-            return B115200;
-        default:
-            return B115200;
-    }
-}
-
-int open_serial_device(
-    const std::string& device,
-    speed_t baud_rate,
-    logging::Logger& logger) {
-
-    const int fd = open(
-        device.c_str(),
-        O_RDWR | O_NOCTTY | O_SYNC
-    );
-
-    if (fd < 0) {
-        logger.warn(
-            "serial",
-            "open failed: " + device
-                + ", error: " + std::strerror(errno)
-        );
-
-        return -1;
-    }
-
-    if (!configure_serial(fd, baud_rate)) {
-        logger.error(
-            "serial",
-            "configure failed: " + device
-        );
-
-        close(fd);
-        return -1;
-    }
-
-    logger.info(
-        "serial",
-        "serial opened: " + device
-    );
-
-    return fd;
-}
-
-void close_serial_device(int& fd) {
-    if (fd < 0) {
-        return;
-    }
-
-    close(fd);
-    fd = -1;
-}
-
-void print_raw_bytes(
-    const unsigned char* buffer,
-    ssize_t length) {
-
-    std::lock_guard<std::mutex> lock(console_mutex);
-
-    std::cout << "RX " << length << " bytes: ";
-
-    for (ssize_t index = 0; index < length; ++index) {
-        std::cout
-            << "0x"
-            << std::uppercase
-            << std::hex
-            << std::setw(2)
-            << std::setfill('0')
-            << static_cast<int>(buffer[index])
-            << " ";
-    }
-
-    std::cout << std::dec << std::endl;
-}
-
-void print_frame(const protocol::Frame& frame) {
-    std::lock_guard<std::mutex> lock(console_mutex);
-
-    std::cout
-        << "Parsed frame: cmd=0x"
-        << std::uppercase
-        << std::hex
-        << std::setw(2)
-        << std::setfill('0')
-        << static_cast<int>(frame.cmd)
-        << " device_id=0x"
-        << std::setw(2)
-        << static_cast<int>(frame.device_id)
-        << " payload=";
-
-    for (std::uint8_t byte : frame.payload) {
-        std::cout
-            << "0x"
-            << std::setw(2)
-            << static_cast<int>(byte)
-            << " ";
-    }
-
-    std::cout
-        << "crc=0x"
-        << std::setw(4)
-        << frame.crc
-        << std::dec
-        << std::endl;
-}
 
 std::string build_mqtt_topic(
     const std::string& topic_prefix,
@@ -251,27 +85,6 @@ void publish_sensor_data(
     }
 }
 
-void handle_frame(
-    const protocol::Frame& frame,
-    const std::string& mqtt_topic_prefix,
-    publishing::PublisherGroup& publishers,
-    logging::Logger& logger,
-    app::RuntimeMetrics& runtime_metrics) {
-
-    print_frame(frame);
-
-    app::SensorData sensor_data;
-    app::parse_sensor_data(frame, sensor_data);
-    publish_sensor_data(
-        sensor_data,
-        device::ProtocolType::Uart,
-        mqtt_topic_prefix,
-        publishers,
-        logger,
-        runtime_metrics
-    );
-}
-
 logging::Level parse_log_level(
     const std::string& level) {
 
@@ -288,209 +101,6 @@ logging::Level parse_log_level(
     }
 
     return logging::Level::Debug;
-}
-
-void run_serial_worker(
-    const config::SerialConfig& serial_config,
-    const std::string& device,
-    const std::string& mqtt_topic_prefix,
-    publishing::PublisherGroup& publishers,
-    logging::Logger& logger,
-    app::RuntimeMetrics& runtime_metrics) {
-
-    const speed_t serial_baud_rate =
-        to_termios_baud_rate(
-            serial_config.baud_rate
-        );
-
-    const int serial_reconnect_seconds =
-        serial_config.reconnect_interval_seconds;
-
-    const auto serial_reconnect_interval =
-        std::chrono::seconds(
-            serial_reconnect_seconds
-        );
-
-    const std::string reconnect_message =
-        "retrying in "
-        + std::to_string(serial_reconnect_seconds)
-        + " seconds";
-
-    int fd = -1;
-
-    logger.info(
-        "serial",
-        "worker starting: " + device
-    );
-
-    while (fd < 0 && !app::shutdown_requested()) {
-        fd = open_serial_device(
-            device,
-            serial_baud_rate,
-            logger
-        );
-
-        if (fd < 0) {
-            logger.warn(
-                "serial",
-                reconnect_message
-            );
-
-            app::wait_for_shutdown(
-                serial_reconnect_interval
-            );
-        }
-    }
-
-    if (app::shutdown_requested()) {
-        close_serial_device(fd);
-        return;
-    }
-
-    logger.info(
-        "serial",
-        "waiting for raw bytes"
-    );
-
-    protocol::FrameParser parser;
-    unsigned char buffer[256];
-
-    while (!app::shutdown_requested()) {
-        const ssize_t received = read(
-            fd,
-            buffer,
-            sizeof(buffer)
-        );
-
-        if (received < 0) {
-            if (errno == EINTR
-                && app::shutdown_requested()) {
-
-                break;
-            }
-
-            logger.warn(
-                "serial",
-                "read failed: "
-                    + std::string(std::strerror(errno))
-            );
-
-            close_serial_device(fd);
-            parser.reset();
-
-            while (fd < 0
-                   && !app::shutdown_requested()) {
-
-                logger.warn(
-                    "serial",
-                    "connection lost, "
-                        + reconnect_message
-                );
-
-                if (app::wait_for_shutdown(
-                        serial_reconnect_interval)) {
-
-                    break;
-                }
-
-                fd = open_serial_device(
-                    device,
-                    serial_baud_rate,
-                    logger
-                );
-            }
-
-            if (app::shutdown_requested()) {
-                break;
-            }
-
-            logger.info(
-                "serial",
-                "serial connection restored"
-            );
-
-            continue;
-        }
-
-        if (received == 0) {
-            continue;
-        }
-
-        print_raw_bytes(buffer, received);
-
-        const auto frames = parser.feed(
-            buffer,
-            static_cast<std::size_t>(received)
-        );
-
-        const std::size_t crc_error_count =
-            parser.take_crc_error_count();
-
-        if (crc_error_count > 0) {
-            runtime_metrics.record_crc_errors(
-                crc_error_count
-            );
-            runtime_metrics.record_frames_invalid(
-                crc_error_count
-            );
-
-            logger.warn(
-                "protocol",
-                "CRC validation failed, count="
-                    + std::to_string(crc_error_count)
-            );
-        }
-
-        const std::size_t length_error_count =
-            parser.take_length_error_count();
-
-        if (length_error_count > 0) {
-            runtime_metrics.record_length_errors(
-                length_error_count
-            );
-            runtime_metrics.record_frames_invalid(
-                length_error_count
-            );
-
-            logger.warn(
-                "protocol",
-                "invalid payload length, count="
-                    + std::to_string(length_error_count)
-            );
-        }
-
-        const std::size_t overflow_byte_count =
-            parser.take_overflow_byte_count();
-
-        if (overflow_byte_count > 0) {
-            logger.error(
-                "protocol",
-                "ring buffer overflow, dropped_bytes="
-                    + std::to_string(overflow_byte_count)
-            );
-        }
-
-        runtime_metrics.record_frames_parsed(
-            frames.size()
-        );
-
-        for (const auto& frame : frames) {
-            handle_frame(
-                frame,
-                mqtt_topic_prefix,
-                publishers,
-                logger,
-                runtime_metrics
-            );
-        }
-    }
-
-    close_serial_device(fd);
-
-    logger.info(
-        "serial",
-        "worker stopped: " + device
-    );
 }
 
 int run_gateway(
@@ -653,14 +263,35 @@ int run_gateway(
         },
         [&](device::ProtocolType protocol,
             device::ReadCode,
-            const std::string& error) {
-            runtime_metrics.record_protocol_error();
-            if (protocol == device::ProtocolType::ModbusRtu) {
-                runtime_metrics.record_modbus_error();
-            } else if (protocol == device::ProtocolType::SocketCan) {
-                runtime_metrics.record_can_error();
+            const std::string& error,
+            const device::ProtocolErrorStats& stats) {
+            if (stats.crc_errors > 0) {
+                runtime_metrics.record_crc_errors(stats.crc_errors);
             }
-            logger.warn(device::to_string(protocol), error);
+            if (stats.length_errors > 0) {
+                runtime_metrics.record_length_errors(stats.length_errors);
+            }
+            const std::size_t invalid_frames = stats.invalid_frame_count();
+            if (invalid_frames > 0) {
+                runtime_metrics.record_frames_invalid(invalid_frames);
+            }
+            const std::size_t protocol_errors = stats.empty()
+                ? 1
+                : stats.total();
+            runtime_metrics.record_protocol_error(protocol_errors);
+            if (protocol == device::ProtocolType::ModbusRtu) {
+                runtime_metrics.record_modbus_error(protocol_errors);
+            } else if (protocol == device::ProtocolType::SocketCan) {
+                runtime_metrics.record_can_error(protocol_errors);
+            }
+            std::string message = error.empty()
+                ? "protocol input rejected"
+                : error;
+            if (stats.overflow_bytes > 0) {
+                message += ", overflow_bytes="
+                    + std::to_string(stats.overflow_bytes);
+            }
+            logger.warn(device::to_string(protocol), message);
         }
     );
 

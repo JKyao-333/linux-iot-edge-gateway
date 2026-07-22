@@ -70,6 +70,10 @@ int main() {
             == std::string::npos
         || readiness.find("\"serial_worker_count\":2")
             == std::string::npos
+        || readiness.find("\"input_devices_total\":3")
+            == std::string::npos
+        || health.find("\"input_devices_total\":3")
+            == std::string::npos
         || health.find("\"device_online\":2") == std::string::npos
         || health.find("\"device_offline\":1") == std::string::npos
         || health.find("\"protocol\":\"MODBUS_RTU\"")

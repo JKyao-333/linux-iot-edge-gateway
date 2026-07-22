@@ -37,6 +37,7 @@ void RuntimeStatus::set_device_counts(
 
     device_online_count_.store(online);
     device_offline_count_.store(offline);
+    input_device_count_.store(online + offline);
 }
 
 void RuntimeStatus::set_device_statuses(
@@ -69,6 +70,8 @@ std::string RuntimeStatus::health_json(
            << metrics.uptime_seconds()
            << ",\"serial_workers\":"
            << serial_worker_count_.load()
+           << ",\"input_devices_total\":"
+           << input_device_count_.load()
            << ",\"device_online\":"
            << device_online_count_.load()
            << ",\"device_offline\":"
@@ -115,6 +118,8 @@ std::string RuntimeStatus::readiness_json() const {
            << "}"
            << ",\"serial_worker_count\":"
            << serial_worker_count_.load()
+           << ",\"input_devices_total\":"
+           << input_device_count_.load()
            << ",\"mqtt_enabled\":" << mqtt_enabled_
            << ",\"tcp_enabled\":" << tcp_enabled_
            << ",\"cache_backend\":\""

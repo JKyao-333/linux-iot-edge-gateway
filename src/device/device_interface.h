@@ -4,6 +4,7 @@
 #include "device/device_data.h"
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -17,10 +18,30 @@ enum class ReadCode {
     TransportError
 };
 
+struct ProtocolErrorStats {
+    std::size_t crc_errors = 0;
+    std::size_t length_errors = 0;
+    std::size_t overflow_bytes = 0;
+    std::size_t generic_errors = 0;
+
+    std::size_t total() const noexcept {
+        return crc_errors + length_errors + overflow_bytes + generic_errors;
+    }
+
+    std::size_t invalid_frame_count() const noexcept {
+        return crc_errors + length_errors + generic_errors;
+    }
+
+    bool empty() const noexcept {
+        return total() == 0;
+    }
+};
+
 struct DeviceReadResult {
     ReadCode code = ReadCode::Timeout;
     std::optional<app::SensorData> data;
     std::string error;
+    ProtocolErrorStats error_stats;
 };
 
 struct DeviceStatus {

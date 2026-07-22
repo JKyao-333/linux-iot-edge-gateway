@@ -15,7 +15,12 @@ namespace device {
 class DeviceManager {
 public:
     using DataHandler = std::function<void(const app::SensorData&, ProtocolType)>;
-    using ErrorHandler = std::function<void(ProtocolType, ReadCode, const std::string&)>;
+    using ErrorHandler = std::function<void(
+        ProtocolType,
+        ReadCode,
+        const std::string&,
+        const ProtocolErrorStats&
+    )>;
 
     DeviceManager(
         std::chrono::seconds reconnect_interval,

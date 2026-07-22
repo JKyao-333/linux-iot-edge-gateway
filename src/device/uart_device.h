@@ -19,7 +19,7 @@ public:
     DeviceStatus get_device_status() const override;
 
 private:
-    void record_error();
+    void record_errors(std::size_t count = 1);
 
     std::string path_;
     int baud_rate_;

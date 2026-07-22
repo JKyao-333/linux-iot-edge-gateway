@@ -20,13 +20,13 @@ http:
 `GET /health` 在进程可服务时返回 HTTP 200：
 
 ```json
-{"status":"ok","version":"1.0.1","uptime_seconds":12,"serial_workers":1,"mqtt_enabled":true,"tcp_enabled":true,"cache_backend":"sqlite"}
+{"status":"ok","version":"1.0.1","uptime_seconds":12,"serial_workers":1,"input_devices_total":3,"device_online":3,"device_offline":0,"mqtt_enabled":true,"tcp_enabled":true,"cache_backend":"sqlite","devices":[]}
 ```
 
-`GET /ready` 返回配置、缓存和串口工作线程状态。全部就绪时为 HTTP 200，否则为 HTTP 503：
+`GET /ready` 返回配置、缓存和设备管理线程初始化状态。全部就绪时为 HTTP 200，否则为 HTTP 503：
 
 ```json
-{"ready":true,"checks":{"config_loaded":true,"cache_ready":true,"serial_workers_started":true}}
+{"ready":true,"checks":{"config_loaded":true,"cache_ready":true,"serial_workers_started":true},"serial_worker_count":1,"input_devices_total":3,"mqtt_enabled":true,"tcp_enabled":true,"cache_backend":"sqlite"}
 ```
 
 `GET /metrics` 返回 `text/plain; version=0.0.4` 格式的 Prometheus 文本。未知路径返回 HTTP 404。
@@ -45,9 +45,9 @@ iot_gateway_frames_parsed_total 3
 | 指标 | 类型 | 当前数据来源 |
 | --- | --- | --- |
 | `iot_gateway_uptime_seconds` | gauge | 当前进程单调时钟运行时间 |
-| `iot_gateway_serial_worker_count` | gauge | 已启动串口工作线程数 |
+| `iot_gateway_serial_worker_count` | gauge | 已配置的 UART 输入设备数，不包含 Modbus 与 SocketCAN |
 | `iot_gateway_frames_parsed_total` | counter | 成功解析并进入业务处理的协议帧 |
-| `iot_gateway_frames_invalid_total` | counter | CRC 与长度校验拒绝的协议帧 |
+| `iot_gateway_frames_invalid_total` | counter | CRC、长度或字段映射校验拒绝的协议帧 |
 | `iot_gateway_crc_errors_total` | counter | 解析器 CRC16 校验失败计数 |
 | `iot_gateway_length_errors_total` | counter | 解析器非法长度计数 |
 | `iot_gateway_mqtt_publish_success_total` | counter | MQTT 发布成功结果 |
@@ -57,8 +57,15 @@ iot_gateway_frames_parsed_total 3
 | `iot_gateway_cache_depth` | gauge | 进程当前观测到的待补传消息数 |
 | `iot_gateway_cache_enqueue_total` | counter | MQTT 发布失败后成功写入缓存的消息数 |
 | `iot_gateway_cache_flush_attempt_total` | counter | 缓存补传发布尝试次数 |
+| `gateway_device_online_total` | gauge | 当前聚合为在线的输入设备数 |
+| `gateway_device_offline_total` | gauge | 当前聚合为离线的输入设备数 |
+| `gateway_protocol_error_total` | counter | UART、Modbus 与 SocketCAN 输入协议错误总数 |
+| `gateway_modbus_error_total` | counter | Modbus 超时、异常响应、校验或传输错误数 |
+| `gateway_can_error_total` | counter | SocketCAN 帧校验或传输错误数 |
 
-这些指标均来自当前进程实际执行路径，不包含吞吐量、分位延迟或系统级硬件指标。
+`serial_workers`、`serial_worker_count` 和 `iot_gateway_serial_worker_count` 均只表示 UART 输入数量；`input_devices_total` 表示 UART、Modbus 与 SocketCAN 的配置设备总数。`serial_workers_started` 是设备管理线程已经完成初始化的就绪检查字段，即使采用 Modbus-only 或 CAN-only 配置也可以为 `true`。
+
+这些指标均来自当前 `edge_gateway` 进程实际执行路径，进程重启后计数重新开始，不代表跨进程累计值，也不包含吞吐量、分位延迟或系统级硬件指标。
 
 ## 5. 本地验证
 

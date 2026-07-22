@@ -30,6 +30,8 @@ SocketCAN can_frame --> CanDevice -------+        |
 - `read()`：返回数据、超时、协议错误或传输错误；
 - `get_device_status()`：返回协议类型、在线状态、最近更新时间和错误计数。
 
+`DeviceReadResult` 同时携带可选业务数据和 `ProtocolErrorStats`。因此一次 UART 读取中即使前部存在 CRC/长度错误、后部仍解析出合法帧，`DeviceManager` 也会同时调用数据处理器与错误处理器，避免合法数据覆盖同批次协议诊断。
+
 三个输入适配器实现相同接口：
 
 | 适配器 | 输入 | 解析实现 |
@@ -54,7 +56,7 @@ SocketCAN can_frame --> CanDevice -------+        |
 - `last_update_unix_seconds`；
 - `error_count`。
 
-传输错误会关闭当前输入并按串口重连周期重新打开；协议错误只丢弃当前数据，不中止其他输入。HTTP Health 和 Prometheus 指标读取聚合后的设备状态。`/health` 的 `devices` 数组按设备输出 `device_id`、`protocol`、`online`、`last_update` 和 `error_count`，便于定位单个输入通道的状态变化。
+传输错误会关闭当前输入并按配置的重连周期重新打开；协议错误只丢弃当前异常数据，不中止其他输入。Modbus 响应超时计入该设备错误，但 SocketCAN 的正常读超时只表示当前周期无帧，不触发重连。HTTP Health 和 Prometheus 指标读取聚合后的设备状态。`/health` 的 `devices` 数组按设备输出 `device_id`、`protocol`、`online`、`last_update` 和 `error_count`，便于定位单个输入通道的状态变化。
 
 新增指标：
 
@@ -64,6 +66,10 @@ SocketCAN can_frame --> CanDevice -------+        |
 - `gateway_modbus_error_total`；
 - `gateway_can_error_total`。
 
-## 6. 工程边界
+## 6. 配置组合
+
+`serial.devices` 可以为空，只要 Modbus RTU 或 SocketCAN 至少启用一个。当前支持 UART-only、Modbus-only、CAN-only 以及任意混合组合。若三个输入源均未启用，配置加载阶段返回 `at least one input source must be enabled`，不会启动发布与可观测性线程。
+
+## 7. 工程边界
 
 当前 Modbus 寄存器表和 CAN Payload 是仓库定义的参考映射，用于验证多协议接入架构。部署到具体设备时必须按照设备协议手册更新映射并执行硬件联调。本实现和 vcan/socat 测试不构成工业现场、量产可靠性或固定性能结论。
