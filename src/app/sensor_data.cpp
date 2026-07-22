@@ -24,7 +24,7 @@ void add_warning(SensorData& data, const std::string& warning) {
     data.warnings.push_back(warning);
 }
 
-void validate_sensor_data(SensorData& data) {
+void validate_sensor_data_impl(SensorData& data) {
     if (data.temperature_c < -40.0 || data.temperature_c > 85.0) {
         add_warning(data, "temperature out of range");
     }
@@ -76,10 +76,17 @@ bool parse_sensor_data(const protocol::Frame& frame, SensorData& out) {
     out.status = frame.payload[8];
     out.sequence = read_u16_be(frame.payload, 9);
 
-    validate_sensor_data(out);
+    validate_sensor_data_impl(out);
 
     return out.valid;
 }
+
+void validate_sensor_data(SensorData& data) {
+    data.valid = true;
+    data.warnings.clear();
+    validate_sensor_data_impl(data);
+}
+
 std::string sensor_data_to_json(const SensorData& data) {
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(1);

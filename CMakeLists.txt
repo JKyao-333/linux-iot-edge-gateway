@@ -50,6 +50,7 @@ target_include_directories(protocol
 
 add_library(app_core
     src/app/sensor_data.cpp
+    src/device/device_data.cpp
 )
 
 target_include_directories(app_core
@@ -140,6 +141,58 @@ target_link_libraries(tcp_client_test
 target_link_libraries(app_core
     PUBLIC
         protocol
+)
+
+add_library(modbus_protocol
+    src/modbus/modbus_rtu.cpp
+)
+
+target_include_directories(modbus_protocol
+    PUBLIC
+        src
+)
+
+target_link_libraries(modbus_protocol
+    PUBLIC
+        protocol
+        app_core
+)
+
+add_library(can_protocol
+    src/can/can_parser.cpp
+)
+
+target_include_directories(can_protocol
+    PUBLIC
+        src
+)
+
+target_link_libraries(can_protocol
+    PUBLIC
+        app_core
+)
+
+add_library(device_input
+    src/device/serial_port.cpp
+    src/device/uart_device.cpp
+    src/device/modbus_device.cpp
+    src/device/can_device.cpp
+    src/device/device_manager.cpp
+    src/can/socketcan_device.cpp
+)
+
+target_include_directories(device_input
+    PUBLIC
+        src
+)
+
+target_link_libraries(device_input
+    PUBLIC
+        app_core
+        protocol
+        modbus_protocol
+        can_protocol
+        Threads::Threads
 )
 
 add_library(message_cache INTERFACE)
@@ -234,6 +287,7 @@ target_link_libraries(edge_gateway
         runtime_control
         runtime_observability
         http_server
+        device_input
         gateway_config
         mqtt_client
         logger
@@ -605,6 +659,40 @@ register_gateway_test(
     frame_parser_ring_buffer_test
     tests/frame_parser_ring_buffer_test.cpp
     protocol
+)
+
+register_gateway_test(
+    modbus_rtu_test
+    tests/modbus/modbus_rtu_test.cpp
+    modbus_protocol
+)
+
+register_gateway_test(
+    can_parser_test
+    tests/can/can_parser_test.cpp
+    can_protocol
+)
+
+register_gateway_test(
+    modbus_device_timeout_test
+    tests/modbus/modbus_device_timeout_test.cpp
+    device_input
+)
+
+register_gateway_test(
+    device_manager_test
+    tests/device_manager_test.cpp
+    device_input
+)
+
+set_tests_properties(
+    modbus_rtu_test
+    can_parser_test
+    modbus_device_timeout_test
+    device_manager_test
+    PROPERTIES
+        LABELS "device;protocol"
+        TIMEOUT 5
 )
 
 add_test(

@@ -422,6 +422,38 @@ int main() {
         return 1;
     }
 
+    if (!write_file(
+            test_path,
+            "modbus:\n"
+            "  enabled: true\n"
+            "  function_code: 6\n")) {
+        std::cerr << "failed to write invalid Modbus function" << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(test_path, "modbus.function_code")) {
+        std::cerr << "invalid Modbus function was not rejected" << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "can:\n"
+            "  enabled: true\n"
+            "  interface: \"\"\n")) {
+        std::cerr << "failed to write empty CAN interface" << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(test_path, "can.interface")) {
+        std::cerr << "empty CAN interface was not rejected" << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
     std::remove(test_path.c_str());
 
     std::cout

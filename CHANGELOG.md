@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+### 多协议设备接入
+
+- 新增统一 `DeviceInterface` 与 `DeviceManager`，将 UART、Modbus RTU 和 SocketCAN 输入转换为公共 `SensorData`。
+- 新增 Modbus RTU Master，支持功能码 03/04、CRC、响应超时、异常响应和长度校验。
+- 新增 Linux SocketCAN 输入、CAN ID/DLC/Payload 解析和 `vcan0` 集成测试路径。
+- HTTP Health 与 Prometheus Metrics 增加设备在线、离线及协议错误状态。
+- 新增三协议集成测试脚本和 Modbus、SocketCAN 工程文档。
+
 ### 可观测性与本地复现
 
 - 新增可选 HTTP Health、Ready 与 Metrics endpoint。

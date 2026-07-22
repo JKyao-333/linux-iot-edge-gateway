@@ -134,6 +134,55 @@ bool load_gateway_config(
             );
         }
 
+        const YAML::Node modbus = root["modbus"];
+        if (modbus) {
+            load_if_present(modbus, "enabled", gateway_config.modbus.enabled);
+            load_if_present(modbus, "port", gateway_config.modbus.port);
+            load_if_present(modbus, "baud_rate", gateway_config.modbus.baud_rate);
+            load_if_present(modbus, "baudrate", gateway_config.modbus.baud_rate);
+
+            int slave_id = gateway_config.modbus.slave_id;
+            int function_code = gateway_config.modbus.function_code;
+            int start_address = gateway_config.modbus.start_address;
+            int register_count = gateway_config.modbus.register_count;
+            load_if_present(modbus, "slave_id", slave_id);
+            load_if_present(modbus, "function_code", function_code);
+            load_if_present(modbus, "start_address", start_address);
+            load_if_present(modbus, "register_count", register_count);
+            load_if_present(modbus, "poll_interval_ms", gateway_config.modbus.poll_interval_ms);
+            load_if_present(modbus, "response_timeout_ms", gateway_config.modbus.response_timeout_ms);
+
+            if (slave_id < 1 || slave_id > 247) {
+                error_message = "modbus.slave_id must be between 1 and 247";
+                return false;
+            }
+            if (function_code != 3 && function_code != 4) {
+                error_message = "modbus.function_code must be 3 or 4";
+                return false;
+            }
+            if (start_address < 0 || start_address > 65535
+                || register_count < 1 || register_count > 125) {
+                error_message = "Modbus register range is invalid";
+                return false;
+            }
+
+            gateway_config.modbus.slave_id = static_cast<std::uint8_t>(slave_id);
+            gateway_config.modbus.function_code = static_cast<std::uint8_t>(function_code);
+            gateway_config.modbus.start_address = static_cast<std::uint16_t>(start_address);
+            gateway_config.modbus.register_count = static_cast<std::uint16_t>(register_count);
+        }
+
+        const YAML::Node can = root["can"];
+        if (can) {
+            load_if_present(can, "enabled", gateway_config.can.enabled);
+            load_if_present(can, "interface", gateway_config.can.interface);
+            load_if_present(
+                can,
+                "heartbeat_timeout_seconds",
+                gateway_config.can.heartbeat_timeout_seconds
+            );
+        }
+
         const YAML::Node mqtt = root["mqtt"];
 
         if (mqtt) {
@@ -379,6 +428,32 @@ bool load_gateway_config(
             error_message =
                 "serial reconnect interval must be positive";
 
+            return false;
+        }
+
+        if (gateway_config.modbus.enabled) {
+            if (gateway_config.modbus.port.empty()) {
+                error_message = "modbus.port must not be empty when enabled";
+                return false;
+            }
+            if (!is_supported_baud_rate(gateway_config.modbus.baud_rate)) {
+                error_message = "modbus.baud_rate is not supported";
+                return false;
+            }
+            if (gateway_config.modbus.poll_interval_ms < 1
+                || gateway_config.modbus.response_timeout_ms < 1) {
+                error_message = "Modbus timing values must be positive";
+                return false;
+            }
+        }
+
+        if (gateway_config.can.enabled && gateway_config.can.interface.empty()) {
+            error_message = "can.interface must not be empty when enabled";
+            return false;
+        }
+
+        if (gateway_config.can.heartbeat_timeout_seconds < 1) {
+            error_message = "can.heartbeat_timeout_seconds must be positive";
             return false;
         }
 

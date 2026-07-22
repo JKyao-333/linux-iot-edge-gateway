@@ -21,5 +21,6 @@ struct SensorData {
     std::vector<std::string> warnings;
 };
 bool parse_sensor_data(const protocol::Frame& frame, SensorData& out);
+void validate_sensor_data(SensorData& data);
 std::string sensor_data_to_json(const SensorData& data);
 }  // namespace app

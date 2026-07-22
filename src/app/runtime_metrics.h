@@ -25,6 +25,10 @@ public:
     void set_cache_depth(std::size_t depth) noexcept;
     void record_cache_enqueue(std::size_t count = 1) noexcept;
     void record_cache_flush_attempt(std::size_t count = 1) noexcept;
+    void set_device_counts(std::size_t online, std::size_t offline) noexcept;
+    void record_protocol_error(std::size_t count = 1) noexcept;
+    void record_modbus_error(std::size_t count = 1) noexcept;
+    void record_can_error(std::size_t count = 1) noexcept;
 
     std::string render_prometheus() const;
 
@@ -44,6 +48,11 @@ private:
     std::atomic<std::uint64_t> cache_depth_{0};
     std::atomic<std::uint64_t> cache_enqueue_total_{0};
     std::atomic<std::uint64_t> cache_flush_attempt_total_{0};
+    std::atomic<std::uint64_t> device_online_total_{0};
+    std::atomic<std::uint64_t> device_offline_total_{0};
+    std::atomic<std::uint64_t> protocol_error_total_{0};
+    std::atomic<std::uint64_t> modbus_error_total_{0};
+    std::atomic<std::uint64_t> can_error_total_{0};
 };
 
 }  // namespace app

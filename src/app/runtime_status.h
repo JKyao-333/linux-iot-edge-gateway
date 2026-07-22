@@ -4,9 +4,20 @@
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
+#include <mutex>
 #include <string>
+#include <vector>
 
 namespace app {
+
+struct DeviceHealthStatus {
+    std::uint32_t device_id = 0;
+    std::string protocol;
+    bool online = false;
+    std::uint64_t last_update_unix_seconds = 0;
+    std::uint64_t error_count = 0;
+};
 
 class RuntimeStatus {
 public:
@@ -23,6 +34,8 @@ public:
         bool started,
         std::size_t worker_count
     ) noexcept;
+    void set_device_counts(std::size_t online, std::size_t offline) noexcept;
+    void set_device_statuses(std::vector<DeviceHealthStatus> statuses);
 
     bool ready() const noexcept;
     std::string health_json(
@@ -39,6 +52,10 @@ private:
     std::atomic<bool> cache_ready_{false};
     std::atomic<bool> serial_workers_started_{false};
     std::atomic<std::size_t> serial_worker_count_{0};
+    std::atomic<std::size_t> device_online_count_{0};
+    std::atomic<std::size_t> device_offline_count_{0};
+    mutable std::mutex device_statuses_mutex_;
+    std::vector<DeviceHealthStatus> device_statuses_;
 };
 
 }  // namespace app

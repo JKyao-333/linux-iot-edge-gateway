@@ -14,6 +14,24 @@ struct SerialConfig {
     int reconnect_interval_seconds = 2;
 };
 
+struct ModbusConfig {
+    bool enabled = false;
+    std::string port = "/dev/ttyUSB0";
+    int baud_rate = 115200;
+    std::uint8_t slave_id = 1;
+    std::uint8_t function_code = 3;
+    std::uint16_t start_address = 0;
+    std::uint16_t register_count = 6;
+    int poll_interval_ms = 1000;
+    int response_timeout_ms = 500;
+};
+
+struct CanConfig {
+    bool enabled = false;
+    std::string interface = "can0";
+    int heartbeat_timeout_seconds = 5;
+};
+
 struct MqttTlsConfig {
     bool enabled = false;
     std::string ca_file;
@@ -56,6 +74,8 @@ struct LogConfig {
 
 struct GatewayConfig {
     SerialConfig serial;
+    ModbusConfig modbus;
+    CanConfig can;
     MqttConfig mqtt;
     TcpConfig tcp;
     HttpConfig http;

@@ -108,6 +108,26 @@ void RuntimeMetrics::record_cache_flush_attempt(
     cache_flush_attempt_total_.fetch_add(count);
 }
 
+void RuntimeMetrics::set_device_counts(
+    std::size_t online,
+    std::size_t offline) noexcept {
+
+    device_online_total_.store(online);
+    device_offline_total_.store(offline);
+}
+
+void RuntimeMetrics::record_protocol_error(std::size_t count) noexcept {
+    protocol_error_total_.fetch_add(count);
+}
+
+void RuntimeMetrics::record_modbus_error(std::size_t count) noexcept {
+    modbus_error_total_.fetch_add(count);
+}
+
+void RuntimeMetrics::record_can_error(std::size_t count) noexcept {
+    can_error_total_.fetch_add(count);
+}
+
 std::string RuntimeMetrics::render_prometheus() const {
     std::ostringstream output;
 
@@ -201,6 +221,41 @@ std::string RuntimeMetrics::render_prometheus() const {
         "counter",
         "Offline cache replay passes attempted.",
         cache_flush_attempt_total_.load()
+    );
+    write_metric(
+        output,
+        "gateway_device_online_total",
+        "gauge",
+        "Devices currently considered online.",
+        device_online_total_.load()
+    );
+    write_metric(
+        output,
+        "gateway_device_offline_total",
+        "gauge",
+        "Devices currently considered offline.",
+        device_offline_total_.load()
+    );
+    write_metric(
+        output,
+        "gateway_protocol_error_total",
+        "counter",
+        "Input protocol errors reported by device adapters.",
+        protocol_error_total_.load()
+    );
+    write_metric(
+        output,
+        "gateway_modbus_error_total",
+        "counter",
+        "Modbus RTU timeout, transport, and response errors.",
+        modbus_error_total_.load()
+    );
+    write_metric(
+        output,
+        "gateway_can_error_total",
+        "counter",
+        "SocketCAN transport and CAN payload errors.",
+        can_error_total_.load()
     );
 
     return output.str();

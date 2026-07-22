@@ -103,6 +103,12 @@ int main(int argc, char* argv[]) {
             == "/tmp/tty_gateway"
         && gateway_config.serial.baud_rate
             == 115200
+        && !gateway_config.modbus.enabled
+        && gateway_config.modbus.slave_id == 1
+        && gateway_config.modbus.function_code == 3
+        && gateway_config.modbus.register_count == 6
+        && !gateway_config.can.enabled
+        && gateway_config.can.interface == "can0"
         && gateway_config.mqtt.host
             == "localhost"
         && gateway_config.mqtt.port

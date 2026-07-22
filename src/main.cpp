@@ -6,6 +6,10 @@
 #include "cache/message_cache.h"
 #include "cache/sqlite_cache.h"
 #include "config/gateway_config.h"
+#include "device/can_device.h"
+#include "device/device_manager.h"
+#include "device/modbus_device.h"
+#include "device/uart_device.h"
 #include "log/logger.h"
 #include "http/http_server.h"
 #include "mqtt/mqtt_client.h"
@@ -203,6 +207,50 @@ std::string build_mqtt_topic(
         + "/data";
 }
 
+void publish_sensor_data(
+    const app::SensorData& sensor_data,
+    device::ProtocolType protocol,
+    const std::string& mqtt_topic_prefix,
+    publishing::PublisherGroup& publishers,
+    logging::Logger& logger,
+    app::RuntimeMetrics& runtime_metrics) {
+
+    const std::string json = app::sensor_data_to_json(sensor_data);
+    const std::string protocol_name = device::to_string(protocol);
+
+    if (!sensor_data.valid) {
+        logger.warn(protocol_name, "invalid sensor data: " + json);
+        runtime_metrics.record_protocol_error();
+        return;
+    }
+
+    logger.info(
+        "sensor",
+        "parsed data: " + json + ", protocol=" + protocol_name
+    );
+    const auto outcomes = publishers.publish(
+        build_mqtt_topic(mqtt_topic_prefix, sensor_data),
+        json
+    );
+
+    for (const auto& outcome : outcomes) {
+        const std::string message = "publish result="
+            + std::string(publishing::to_string(outcome.status));
+        if (outcome.status == publishing::PublishStatus::Failed) {
+            logger.warn(outcome.channel, message);
+        } else {
+            logger.debug(outcome.channel, message);
+        }
+        if (outcome.channel == "tcp") {
+            if (outcome.status == publishing::PublishStatus::Published) {
+                runtime_metrics.record_tcp_publish_success();
+            } else {
+                runtime_metrics.record_tcp_publish_failed();
+            }
+        }
+    }
+}
+
 void handle_frame(
     const protocol::Frame& frame,
     const std::string& mqtt_topic_prefix,
@@ -214,59 +262,14 @@ void handle_frame(
 
     app::SensorData sensor_data;
     app::parse_sensor_data(frame, sensor_data);
-
-    const std::string json =
-        app::sensor_data_to_json(sensor_data);
-
-    if (!sensor_data.valid) {
-        logger.warn(
-            "sensor",
-            "invalid data: " + json
-        );
-
-        return;
-    }
-
-    logger.info(
-        "sensor",
-        "parsed data: " + json
-    );
-
-    const std::string topic = build_mqtt_topic(
+    publish_sensor_data(
+        sensor_data,
+        device::ProtocolType::Uart,
         mqtt_topic_prefix,
-        sensor_data
+        publishers,
+        logger,
+        runtime_metrics
     );
-
-    const auto outcomes = publishers.publish(
-        topic,
-        json
-    );
-
-    for (const auto& outcome : outcomes) {
-        const std::string message =
-            "publish result="
-            + std::string(
-                publishing::to_string(outcome.status)
-            );
-
-        if (outcome.status
-            == publishing::PublishStatus::Failed) {
-
-            logger.warn(outcome.channel, message);
-        } else {
-            logger.debug(outcome.channel, message);
-        }
-
-        if (outcome.channel == "tcp") {
-            if (outcome.status
-                == publishing::PublishStatus::Published) {
-
-                runtime_metrics.record_tcp_publish_success();
-            } else {
-                runtime_metrics.record_tcp_publish_failed();
-            }
-        }
-    }
 }
 
 logging::Level parse_log_level(
@@ -599,41 +602,124 @@ int run_gateway(
 
     mqtt_publisher.flush_cache();
 
-    std::vector<std::thread> serial_workers;
-    serial_workers.reserve(devices.size());
-
-    for (const auto& device : devices) {
-        serial_workers.emplace_back(
-            [&gateway_config,
-             &publishers,
-             &logger,
-             &runtime_metrics,
-             device]() {
-
-                run_serial_worker(
-                    gateway_config.serial,
-                    device,
-                    gateway_config.mqtt.topic_prefix,
-                    publishers,
-                    logger,
-                    runtime_metrics
-                );
-            }
-        );
-    }
-
-    logger.info(
-        "serial",
-        "worker count="
-            + std::to_string(serial_workers.size())
+    device::DeviceManager device_manager(
+        std::chrono::seconds(
+            gateway_config.serial.reconnect_interval_seconds
+        ),
+        std::chrono::seconds(
+            gateway_config.can.heartbeat_timeout_seconds
+        )
     );
 
+    for (const auto& serial_device : devices) {
+        device_manager.add(std::make_unique<device::UartDevice>(
+            serial_device,
+            gateway_config.serial.baud_rate
+        ));
+    }
+
+    if (gateway_config.modbus.enabled) {
+        device::ModbusDeviceOptions options;
+        options.port = gateway_config.modbus.port;
+        options.baud_rate = gateway_config.modbus.baud_rate;
+        options.request.slave_id = gateway_config.modbus.slave_id;
+        options.request.function = gateway_config.modbus.function_code == 4
+            ? modbus::FunctionCode::ReadInputRegisters
+            : modbus::FunctionCode::ReadHoldingRegisters;
+        options.request.start_address = gateway_config.modbus.start_address;
+        options.request.register_count = gateway_config.modbus.register_count;
+        options.poll_interval_ms = gateway_config.modbus.poll_interval_ms;
+        options.response_timeout_ms = gateway_config.modbus.response_timeout_ms;
+        device_manager.add(std::make_unique<device::ModbusDevice>(options));
+    }
+
+    if (gateway_config.can.enabled) {
+        device_manager.add(std::make_unique<device::CanDevice>(
+            gateway_config.can.interface
+        ));
+    }
+
+    device_manager.start(
+        [&](const app::SensorData& data, device::ProtocolType protocol) {
+            runtime_metrics.record_frames_parsed();
+            publish_sensor_data(
+                data,
+                protocol,
+                gateway_config.mqtt.topic_prefix,
+                publishers,
+                logger,
+                runtime_metrics
+            );
+        },
+        [&](device::ProtocolType protocol,
+            device::ReadCode,
+            const std::string& error) {
+            runtime_metrics.record_protocol_error();
+            if (protocol == device::ProtocolType::ModbusRtu) {
+                runtime_metrics.record_modbus_error();
+            } else if (protocol == device::ProtocolType::SocketCan) {
+                runtime_metrics.record_can_error();
+            }
+            logger.warn(device::to_string(protocol), error);
+        }
+    );
+
+    if (!devices.empty()) {
+        for (int attempt = 0; attempt < 20; ++attempt) {
+            std::size_t uart_online = 0;
+            for (const auto& status : device_manager.statuses()) {
+                if (status.protocol == device::ProtocolType::Uart
+                    && status.online) {
+                    ++uart_online;
+                }
+            }
+            if (uart_online == devices.size()) {
+                for (std::size_t index = 0; index < uart_online; ++index) {
+                    logger.info("serial", "serial opened by device manager");
+                }
+                logger.info("serial", "waiting for raw bytes");
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+
+    const std::size_t input_count = devices.size()
+        + (gateway_config.modbus.enabled ? 1U : 0U)
+        + (gateway_config.can.enabled ? 1U : 0U);
+    logger.info("device", "input count=" + std::to_string(input_count));
+    logger.info("serial", "worker count=" + std::to_string(devices.size()));
+
+    const auto update_device_observability = [&] {
+        const auto statuses = device_manager.statuses();
+        std::size_t online = 0;
+        std::vector<app::DeviceHealthStatus> health_statuses;
+        health_statuses.reserve(statuses.size());
+        for (const auto& status : statuses) {
+            if (status.online) {
+                ++online;
+            }
+            health_statuses.push_back({
+                status.device_id,
+                device::to_string(status.protocol),
+                status.online,
+                status.last_update_unix_seconds,
+                status.error_count
+            });
+        }
+        const std::size_t offline = statuses.size() - online;
+        runtime_metrics.set_device_counts(online, offline);
+        runtime_status.set_device_counts(online, offline);
+        runtime_status.set_device_statuses(std::move(health_statuses));
+    };
+    update_device_observability();
+
     runtime_metrics.set_serial_worker_count(
-        serial_workers.size()
+        devices.size()
     );
     runtime_status.set_serial_workers_started(
         true,
-        serial_workers.size()
+        devices.size()
     );
 
     const auto cache_retry_interval =
@@ -646,22 +732,19 @@ int run_gateway(
         cache_retry_interval)) {
 
         mqtt_publisher.flush_cache();
+        update_device_observability();
     }
 
     runtime_status.set_serial_workers_started(
         false,
-        serial_workers.size()
+        devices.size()
     );
 
     if (http_server != nullptr) {
         http_server->stop();
     }
 
-    for (auto& worker : serial_workers) {
-        if (worker.joinable()) {
-            worker.join();
-        }
-    }
+    device_manager.stop();
 
     tcp_client.disconnect();
     return 0;
