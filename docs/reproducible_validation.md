@@ -4,7 +4,7 @@
 
 本验证用于确认 `edge_gateway` 的核心数据链路能够在公开可获得的 STM32 兼容节点和 ARM64 Linux 平台上复现，包括串口接入、协议解析、数据上报、离线缓存与异常恢复。
 
-本文件记录的是公开复现验证（Reproducible Reference Validation）。早期课题组 STM32/ARM64 硬件验证（Historical Lab Validation）已经完成，但部分设备型号、系统镜像、测试时长和原始记录仍待设备台账补录。两类验证属于独立证据，OpenM3 与 Raspberry Pi 4 不替代历史设备记录。
+本文件记录公开复现验证（Reproducible Reference Validation）的拓扑、平台、验证矩阵和工程边界。运行环境和本地结果由脚本按次生成，公开证据字段统一记录在[公开复现证据台账](reproducible_evidence_ledger.md)。
 
 ## 2. 验证拓扑
 
@@ -61,7 +61,6 @@ Python 模拟器、`socat` 虚拟串口、CTest/CI、AArch64 交叉编译和 QEM
 - 不声明 P99 时延。
 - 不声明 7x24 小时生产可用性。
 - 不覆盖工业现场 EMC、电源扰动和极端网络条件。
-- 不声明 OpenM3 或 Raspberry Pi 4 等同于历史课题组原始设备。
 - 本验证不构成工业现场量产验证。
 
-相关历史验证边界与待补录字段见 [hardware_validation.md](hardware_validation.md) 和 [arm64_stability_test.md](arm64_stability_test.md)，参考资料见 [references.md](references.md)。
+公开仓库使用公开复现证据台账记录可公开、已脱敏和可复现的证据字段。PCB revision、USB-UART 芯片、固定固件 commit、固定 TTY 路径、原始抓包和仪器记录不作为当前公开复现结论的必要依据。详细字段见[公开复现证据台账](reproducible_evidence_ledger.md)，参考资料见 [references.md](references.md)。

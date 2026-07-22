@@ -2,23 +2,23 @@
 
 ## 1. 文档范围
 
-项目已完成 STM32 下位机通过物理串口接入 Linux 网关的功能验证。本文件分别记录早期课题组硬件验证（Historical Lab Validation）和公开复现验证（Reproducible Reference Validation）的边界、软件参数、步骤与结论。
+本文件记录 STM32-compatible UART 数据源接入 Linux 网关的公开复现环境、软件参数、步骤、结果与边界。公开复现平台为 FIT IoT-LAB M3 / OpenM3-compatible STM32 node，MCU 为公开资料记载的 STM32F103REY。
 
-早期课题组 STM32 硬件验证已经完成。原始实验记录未随仓库提交，因此 MCU 完整料号、板卡编号、USB 转串口芯片序列号、测试日期和责任人等字段保留在课题组设备台账中。本文不使用公开复现平台的参数替代历史设备记录。
+公开仓库使用[公开复现证据台账](reproducible_evidence_ledger.md)记录可公开、已脱敏和可复现的证据字段。PCB revision、USB-UART 芯片、固定固件 commit、固定 TTY 路径、原始抓包和仪器记录不作为当前公开复现结论的必要依据。
 
 ## 2. 验证环境
 
 | 项目 | 本项目记录 |
 | --- | --- |
-| 下位机 | STM32 多传感器终端，具体 MCU 料号待从设备台账补录 |
-| Linux 端 | 运行 `edge_gateway` 的 Linux 主机或 ARM64 开发板 |
+| 下位机 | FIT IoT-LAB M3 / OpenM3-compatible STM32 node，STM32F103REY |
+| Linux 端 | Raspberry Pi 4 Model B 64-bit Linux 或脚本化 Linux 复现环境 |
 | 物理链路 | STM32 UART -> USB 转串口/板载串口 -> Linux TTY |
 | 波特率 | 115200 bit/s |
 | 数据格式 | 8 数据位、无校验、1 停止位、无硬件流控 |
 | 串口模式 | `termios` raw mode |
 | 数据类型 | 温度、湿度、气体浓度、电池电压、设备状态、序列号 |
 
-FIT IoT-LAB OpenM3 兼容 STM32 节点已作为公开复现验证平台，用于验证 STM32 兼容 UART 数据源与网关协议兼容性。OpenM3 不等同于早期课题组历史验证设备，历史设备的完整型号仍以待补录的设备台账为准。
+FIT IoT-LAB M3 / OpenM3-compatible STM32 node 用于验证 STM32-compatible UART 数据源与网关协议兼容性。公开平台的 MCU 型号来自 FIT IoT-LAB 官方硬件资料；其余不固定字段按公开证据边界处理，不从缺失信息推断。
 
 ## 3. 协议帧
 
@@ -54,7 +54,7 @@ FIT IoT-LAB OpenM3 兼容 STM32 节点已作为公开复现验证平台，用于
 
 | 检查项 | 结果 |
 | --- | --- |
-| STM32 物理串口字节接收 | 通过 |
+| OpenM3-compatible STM32 节点串口字节接收 | 公开复现验证通过 |
 | 帧头、长度和命令字解析 | 通过 |
 | CRC16-Modbus 校验 | 通过 |
 | 温湿度、气体、电池、状态和序列号解析 | 通过 |
@@ -73,14 +73,10 @@ FIT IoT-LAB OpenM3 兼容 STM32 节点已作为公开复现验证平台，用于
 
 ## 7. 结论
 
-STM32 下位机与 Linux 网关之间的物理串口链路、协议兼容性、异常帧处理和断线恢复已完成历史实验室验证。OpenM3 兼容 STM32 节点已完成公开复现验证。两类验证相互补充但不互相替代；Python 模拟器与 `socat` 虚拟串口继续用于日常回归，但不作为物理串口电气层验证的替代。
+OpenM3-compatible STM32 节点的 UART 接入、协议兼容性、异常帧处理和断线恢复已形成公开复现路径。Python 模拟器与 `socat` 虚拟串口用于无硬件回归，但不用于证明真实串口电气层、供电或 EMC 条件。
 
-## 8. 待归档台账字段
+## 8. 公开证据边界
 
-- STM32 完整型号、PCB 版本和固件提交号
-- USB 转串口芯片型号与接线定义
-- Linux 内核版本、TTY 节点和测试日期
-- 发送周期、累计帧数、CRC 错误计数和断线次数
-- 原始串口抓包与示波器/逻辑分析仪记录索引
+运行环境、测试日期、TTY 摘要和运行期计数由脚本写入本地 `artifacts/`。当前仓库不提交真实设备序列号、未脱敏日志、原始串口抓包或仪器工程文件，也不据此声明工业现场或量产可靠性。
 
-参考硬件来源见 [references.md](references.md)。
+公开平台字段、运行期字段和不声明字段统一见[公开复现证据台账](reproducible_evidence_ledger.md)，硬件来源见 [references.md](references.md)。

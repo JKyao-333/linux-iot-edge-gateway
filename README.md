@@ -11,7 +11,7 @@
 - 已在 ARM64 Linux 开发板上完成串口采集、MQTT/TCP 上报、离线缓存补传和异常恢复的稳定性测试。
 - 已在 FIT IoT-LAB OpenM3 兼容 STM32 节点和 Raspberry Pi 4 Model B 64-bit Linux 环境中完成核心链路复现验证。
 - 仓库继续保留 Python 数据模拟器、`socat` 虚拟串口、CTest/CI 和 QEMU AArch64 启动校验，作为不依赖实验室硬件的可重复验证路径。
-- 早期课题组硬件验证与公开复现验证属于两套独立证据；历史设备台账待补录字段见[硬件接入验证](docs/hardware_validation.md)与[ARM64 稳定性测试](docs/arm64_stability_test.md)。
+- 公开仓库使用[公开复现证据台账](docs/reproducible_evidence_ledger.md)统一记录可公开、已脱敏和可复现的验证字段及边界。
 
 ## 核心能力
 
@@ -407,6 +407,7 @@ docker compose up --build
 - [STM32 硬件接入验证](docs/hardware_validation.md)
 - [ARM64 稳定性测试](docs/arm64_stability_test.md)
 - [OpenM3 与 Raspberry Pi 4 复现验证](docs/reproducible_validation.md)
+- [公开复现证据台账](docs/reproducible_evidence_ledger.md)
 - [故障注入测试](docs/fault_injection.md)
 - [环境采集](docs/environment_capture.md)
 - [稳定性测试](docs/stability_test.md)

@@ -13,9 +13,9 @@
 7. Health Check；
 8. 日志脱敏归档；
 9. OpenM3 + Raspberry Pi 4 公开复现；
-10. 历史实验室 STM32 / ARM64 验证记录。
+10. 公开复现证据摘要与台账。
 
-这些层级分别覆盖代码级回归、用户态端到端链路、异常恢复、运行趋势、问题回放和硬件复现。各层结果互为补充，不能用单项结果替代完整设备台账或长期硬件记录。
+这些层级分别覆盖代码级回归、用户态端到端链路、异常恢复、运行趋势、问题回放和硬件复现。各层结果互为补充，公开字段与边界统一见[公开复现证据台账](reproducible_evidence_ledger.md)。
 
 ## 2. 推荐执行顺序
 
@@ -24,6 +24,7 @@
 ./scripts/run_fault_injection_test.sh
 ./scripts/run_observability_test.sh
 ./scripts/collect_env.sh --include-git --include-packages --output artifacts/env_report.md
+./scripts/collect_evidence_summary.sh
 ./scripts/run_stability_test.sh --duration-seconds 60 --rate-hz 1 --collect-env
 python3 scripts/serial_replay.py --input data/test_frames/valid_frames.hex --serial /tmp/tty_dummy --dry-run
 ./scripts/check_gateway_health.sh --service linux-iot-edge-gateway --process-name edge_gateway --output artifacts/health_check.md || true
@@ -92,14 +93,14 @@ python3 scripts/sanitize_logs.py \
     --output artifacts/stability_<timestamp>/gateway_sanitized.log
 ```
 
-只记录实际运行得到的测试时长和结果。OpenM3 与 Raspberry Pi 4 是公开复现平台，不是早期历史设备的替代记录。
+只记录实际运行得到的测试时长和结果。OpenM3 与 Raspberry Pi 4 是当前公开复现平台，其可公开字段与不声明字段由公开复现证据台账统一说明。
 
 ## 5. 结果归档建议
 
 - `artifacts/` 默认不提交；
 - 原始日志和本机环境报告默认不公开；
-- 脱敏后的摘要可以复制到工程文档或实验台账；
-- 真实设备型号、OpenM3 固件 commit、Raspberry Pi 4 镜像摘要和长稳运行时长仍需人工补录；
+- 脱敏后的摘要经复核后可以转写到公开工程文档或公开复现证据台账；
+- 固件 commit、系统镜像摘要和长时间运行参数仅在存在可公开证据时记录，否则当前公开复现路径不声明；
 - 不提交真实串口抓包、数据库、证书、账号、设备序列号、本机绝对路径或未脱敏日志；
 - `data/test_frames/` 只保存合成测试帧，不保存现场真实采集数据。
 
@@ -109,5 +110,6 @@ python3 scripts/sanitize_logs.py \
 - 不代表工业现场 EMC、电源扰动或极端网络条件；
 - 不声明固定吞吐量、P99 时延或 7x24 小时可用性；
 - 不替代正式产品级可靠性认证；
-- 不替代历史实验室设备台账；
 - 不替代真实硬件长期测试的原始数据。
+
+公开仓库使用公开复现证据台账记录可公开、已脱敏和可复现的证据字段。PCB revision、USB-UART 芯片、固定固件 commit、固定 TTY 路径、原始抓包和仪器记录不作为当前公开复现结论的必要依据。

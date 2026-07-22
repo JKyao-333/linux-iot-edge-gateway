@@ -322,7 +322,7 @@ fi
     echo "- The current account name is replaced with \`<redacted-user>\`."
     echo "- Serial numbers, MAC addresses, Wi-Fi names, public IPs, and credentials are not collected."
     echo "- Missing commands are recorded as \`not found\` and do not make collection fail."
-    echo "- This report supports reproducibility records and does not replace the original equipment ledger."
+    echo "- This report captures per-run environment fields and complements the public reproducibility evidence ledger."
 } >>"${OUTPUT_PATH}"
 
 echo "[PASS] environment report written: ${OUTPUT_PATH}"

@@ -45,6 +45,8 @@ Testing/
 # Local validation artifacts
 /artifacts/*
 !/artifacts/README.md
+/artifacts/evidence_summary.md
+/artifacts/evidence/
 stability_*/
 fault_injection_raw.log
 observability_test_raw.log

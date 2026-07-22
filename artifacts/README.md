@@ -5,6 +5,6 @@ Generated reports, logs, CSV samples, SQLite databases, and device-specific
 environment records are ignored by Git.
 
 After reviewing and redacting a result, copy only the required summary into the
-relevant engineering document or the laboratory equipment ledger. Do not commit
+relevant engineering document or the public reproducibility evidence ledger. Do not commit
 raw logs, credentials, device serial numbers, user names, or absolute local
 paths.

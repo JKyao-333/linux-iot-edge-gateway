@@ -26,10 +26,11 @@
 
 ## 4. 公开复现平台资料
 
-- [FIT IoT-LAB OpenM3 schematic](https://github.com/iot-lab/iot-lab/wiki/Docs/openm3-schematics.pdf)：OpenM3 兼容 STM32 节点的硬件资料。该节点已用于本项目公开复现验证。
+- [FIT IoT-LAB M3 board documentation](https://www.iot-lab.info/docs/boards/iot-lab-m3/)：M3 open node 的官方硬件说明，记录 STM32F103REY、ARM Cortex-M3 等公开平台字段。该节点已用于本项目公开复现验证。
+- [FIT IoT-LAB OpenM3 schematic](https://github.com/iot-lab/iot-lab/wiki/Docs/openm3-schematics.pdf)：OpenM3-compatible STM32 节点的原理图资料。
 - [svrooij/smartmeter2mqtt](https://github.com/svrooij/smartmeter2mqtt)：Raspberry Pi ARM64、稳定串口设备路径和多通道部署方式的调研资料。Raspberry Pi 4 Model B + 64-bit Linux 已用于本项目公开复现验证。
 
-OpenM3 和 Raspberry Pi 4 是本项目公开复现验证平台，不等同于早期课题组历史验证设备。
+OpenM3-compatible STM32 node 和 Raspberry Pi 4 Model B 是本项目公开复现平台。可公开字段、运行期字段和不声明字段见[公开复现证据台账](reproducible_evidence_ledger.md)。
 
 ## 5. 技术调研与架构参考
 
