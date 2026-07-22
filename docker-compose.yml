@@ -1,0 +1,37 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    command: mosquitto -c /mosquitto-no-auth.conf
+    volumes:
+      - ./docker/mosquitto.conf:/mosquitto-no-auth.conf:ro
+    ports:
+      - "1883:1883"
+    restart: unless-stopped
+
+  tcp-server:
+    image: python:3.11-slim
+    command: python3 /workspace/scripts/mock_tcp_server.py 9000
+    environment:
+      TCP_SERVER_HOST: 0.0.0.0
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace:ro
+      - ./artifacts/docker:/workspace/artifacts/docker
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+
+  edge-gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gateway
+    depends_on:
+      mosquitto:
+        condition: service_started
+      tcp-server:
+        condition: service_started
+    volumes:
+      - ./artifacts/docker:/app/artifacts/docker
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

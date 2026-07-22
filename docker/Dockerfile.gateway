@@ -1,0 +1,43 @@
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cmake \
+        g++ \
+        libmosquitto-dev \
+        libsqlite3-dev \
+        libyaml-cpp-dev \
+        make \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+RUN cmake -S . -B /build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build /build --target edge_gateway --parallel
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libmosquitto1 \
+        libsqlite3-0 \
+        libyaml-cpp0.7 \
+        mosquitto-clients \
+        python3 \
+        python3-serial \
+        socat \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /build/edge_gateway /app/edge_gateway
+COPY config/gateway.docker.yaml /app/config/gateway.docker.yaml
+COPY scripts/mock_serial_sender.py /app/scripts/mock_serial_sender.py
+COPY docker/entrypoint.sh /app/entrypoint.sh
+
+RUN chmod +x /app/entrypoint.sh \
+    && mkdir -p /app/artifacts/docker
+
+EXPOSE 8080
+ENTRYPOINT ["/app/entrypoint.sh"]

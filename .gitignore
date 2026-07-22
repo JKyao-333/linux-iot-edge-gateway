@@ -47,6 +47,8 @@ Testing/
 !/artifacts/README.md
 stability_*/
 fault_injection_raw.log
+observability_test_raw.log
+observability_test_summary.md
 env_report.md
 /artifacts/**/health_check.md
 /artifacts/**/health_check.json

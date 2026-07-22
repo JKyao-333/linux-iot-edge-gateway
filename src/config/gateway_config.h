@@ -38,6 +38,12 @@ struct TcpConfig {
     std::uint16_t port = 9000;
 };
 
+struct HttpConfig {
+    bool enabled = false;
+    std::string host = "127.0.0.1";
+    std::uint16_t port = 8080;
+};
+
 struct CacheConfig {
     std::string type = "sqlite";
     std::string path = "data/pending_messages.db";
@@ -52,6 +58,7 @@ struct GatewayConfig {
     SerialConfig serial;
     MqttConfig mqtt;
     TcpConfig tcp;
+    HttpConfig http;
     CacheConfig cache;
     LogConfig log;
 };

@@ -63,6 +63,21 @@ int main(int argc, char* argv[]) {
         << std::endl;
 
     std::cout
+        << "http.enabled: "
+        << gateway_config.http.enabled
+        << std::endl;
+
+    std::cout
+        << "http.host: "
+        << gateway_config.http.host
+        << std::endl;
+
+    std::cout
+        << "http.port: "
+        << gateway_config.http.port
+        << std::endl;
+
+    std::cout
         << "cache.type: "
         << gateway_config.cache.type
         << std::endl;
@@ -108,6 +123,11 @@ int main(int argc, char* argv[]) {
             == "127.0.0.1"
         && gateway_config.tcp.port
             == 9000
+        && !gateway_config.http.enabled
+        && gateway_config.http.host
+            == "127.0.0.1"
+        && gateway_config.http.port
+            == 8080
         && gateway_config.cache.type
             == "sqlite"
         && gateway_config.cache.path

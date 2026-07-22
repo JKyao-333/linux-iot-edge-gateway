@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+### 可观测性与本地复现
+
+- 新增可选 HTTP Health、Ready 与 Metrics endpoint。
+- 新增 Prometheus 文本格式运行指标导出，并接入协议、发布和缓存实际执行路径。
+- 新增 Docker Compose 本地复现环境。
+- 新增 HTTP observability 自动化测试脚本。
+- Health Check 支持可选 HTTP 与 Metrics URL 检查。
+
 ### 工程验证
 
 - 新增故障注入测试套件，覆盖异常协议帧、MQTT/TCP 离线、SQLite 补传、串口重连和 SIGTERM 退出。
@@ -23,7 +31,7 @@
 
 - 修正验证边界，记录已完成的 STM32 串口接入和 ARM64 Linux 板级稳定性验证。
 - 新增 STM32 硬件接入验证、ARM64 稳定性测试、模块实现说明和技术参考资料。
-- 删除求职导向文档，统一为课题组预研工程文档。
+- 删除与项目定位无关的说明，统一为课题组预研工程文档。
 - 增加运行数据与日志目录的脱敏和提交规则。
 - 区分历史实验室验证与公开复现验证，记录 OpenM3 兼容节点和 Raspberry Pi 4 Model B 的核心链路复现结果。
 

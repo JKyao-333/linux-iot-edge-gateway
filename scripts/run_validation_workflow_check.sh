@@ -100,6 +100,11 @@ run_required_check \
         --include-git \
         --output "${ARTIFACT_DIR}/env_report.md"
 
+run_required_check \
+    observability \
+    "HTTP observability test" \
+    "${PROJECT_DIR}/scripts/run_observability_test.sh"
+
 OVERALL="PASS"
 (( FAILED == 0 )) || OVERALL="FAIL"
 COLLECTED_AT="$(date --iso-8601=seconds 2>/dev/null || date)"
@@ -120,7 +125,7 @@ GIT_COMMIT="$(git -C "${PROJECT_DIR}" rev-parse HEAD 2>/dev/null || echo unknown
     echo
     echo "The health check is observational in this lightweight workflow. Exit codes 1 and 2 can indicate that the target service or process is not currently running."
     echo
-    echo "This check validates the P1 toolchain only. It does not establish fixed throughput, latency, long-duration availability, or industrial field reliability."
+    echo "This check validates the engineering toolchain, including HTTP observability. It does not establish fixed throughput, latency, long-duration availability, or industrial field reliability."
 } >"${SUMMARY_PATH}" || {
     echo "[ERROR] cannot write workflow summary" >&2
     exit 1

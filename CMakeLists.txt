@@ -66,6 +66,32 @@ target_include_directories(runtime_control
         src
 )
 
+add_library(runtime_observability
+    src/app/runtime_metrics.cpp
+    src/app/runtime_status.cpp
+)
+
+target_include_directories(runtime_observability
+    PUBLIC
+        src
+)
+
+add_library(http_server
+    src/http/http_server.cpp
+)
+
+target_include_directories(http_server
+    PUBLIC
+        src
+)
+
+target_link_libraries(http_server
+    PUBLIC
+        runtime_observability
+        logger
+        Threads::Threads
+)
+
 add_library(gateway_config
     src/config/gateway_config.cpp
 )
@@ -165,6 +191,7 @@ target_link_libraries(reliable_publisher
     PUBLIC
         mqtt_client
         message_cache
+        runtime_observability
 )
 
 add_library(publisher_group
@@ -205,6 +232,8 @@ target_link_libraries(edge_gateway
         tcp_client
         app_core
         runtime_control
+        runtime_observability
+        http_server
         gateway_config
         mqtt_client
         logger
@@ -519,6 +548,26 @@ register_gateway_test(
     gateway_config_invalid_test
     tests/gateway_config_invalid_test.cpp
     gateway_config
+)
+
+register_gateway_test(
+    runtime_observability_test
+    tests/runtime_observability_test.cpp
+    runtime_observability
+)
+
+register_gateway_test(
+    http_server_test
+    tests/http_server_test.cpp
+    http_server
+)
+
+set_tests_properties(
+    runtime_observability_test
+    http_server_test
+    PROPERTIES
+        LABELS "observability"
+        TIMEOUT 10
 )
 
 set_tests_properties(

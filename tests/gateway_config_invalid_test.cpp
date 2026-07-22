@@ -51,6 +51,28 @@ int main() {
     const std::string test_path =
         "/tmp/gateway_config_invalid_test.yaml";
 
+    if (!write_file(test_path, "{}\n")) {
+        std::cerr << "failed to create default config"
+                  << std::endl;
+        return 1;
+    }
+
+    config::GatewayConfig default_config;
+    std::string default_error;
+    if (!config::load_gateway_config(
+            test_path,
+            default_config,
+            default_error)
+        || default_config.http.enabled
+        || default_config.http.host != "127.0.0.1"
+        || default_config.http.port != 8080) {
+
+        std::cerr << "HTTP defaults are incorrect"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
     if (!write_file(
             test_path,
             "mqtt:\n"
@@ -303,6 +325,99 @@ int main() {
             << "TLS insecure flag without TLS was not rejected"
             << std::endl;
 
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "http:\n"
+            "  enabled: true\n"
+            "  port: 0\n")) {
+
+        std::cerr << "failed to write invalid HTTP port"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(test_path, "http.port")) {
+        std::cerr << "invalid HTTP port was not rejected"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "http:\n"
+            "  enabled: true\n"
+            "  host: invalid-host-name\n")) {
+
+        std::cerr << "failed to write invalid HTTP host"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(test_path, "http.host")) {
+        std::cerr << "invalid HTTP host was not rejected"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "http:\n"
+            "  enabled: false\n"
+            "  host: \"\"\n")) {
+
+        std::cerr << "failed to write empty HTTP host"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(test_path, "http.host")) {
+        std::cerr << "empty HTTP host was not rejected"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "http:\n"
+            "  enabled: not-a-boolean\n")) {
+
+        std::cerr << "failed to write invalid HTTP enabled value"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(test_path, "YAML error")) {
+        std::cerr << "invalid HTTP enabled value was not rejected"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!write_file(
+            test_path,
+            "http:\n"
+            "  - enabled\n")) {
+
+        std::cerr << "failed to write invalid HTTP type"
+                  << std::endl;
+        std::remove(test_path.c_str());
+        return 1;
+    }
+
+    if (!expect_load_failure(test_path, "YAML map")) {
+        std::cerr << "invalid HTTP mapping was not rejected"
+                  << std::endl;
         std::remove(test_path.c_str());
         return 1;
     }

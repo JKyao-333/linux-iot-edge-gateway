@@ -22,6 +22,7 @@
 ```bash
 ./scripts/run_smoke_test.sh
 ./scripts/run_fault_injection_test.sh
+./scripts/run_observability_test.sh
 ./scripts/collect_env.sh --include-git --include-packages --output artifacts/env_report.md
 ./scripts/run_stability_test.sh --duration-seconds 60 --rate-hz 1 --collect-env
 python3 scripts/serial_replay.py --input data/test_frames/valid_frames.hex --serial /tmp/tty_dummy --dry-run
@@ -44,6 +45,7 @@ python3 scripts/sanitize_logs.py --input logs/sample_gateway.log --dry-run
 ```bash
 ./scripts/run_smoke_test.sh
 ./scripts/run_fault_injection_test.sh
+./scripts/run_observability_test.sh
 ./scripts/run_stability_test.sh --duration-seconds 60 --rate-hz 1 --collect-env
 python3 scripts/serial_replay.py --input data/test_frames/valid_frames.hex --serial /tmp/tty_dummy --dry-run
 ```

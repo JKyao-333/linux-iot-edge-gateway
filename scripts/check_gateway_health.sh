@@ -12,6 +12,8 @@ MQTT_HOST="localhost"
 MQTT_PORT=1883
 TCP_HOST=""
 TCP_PORT=""
+HTTP_URL=""
+METRICS_URL=""
 JSON_OUTPUT=false
 OUTPUT_PATH=""
 OUTPUT_EXPLICIT=false
@@ -37,6 +39,8 @@ Options:
   --mqtt-port <port>     MQTT port, default: 1883
   --tcp-host <host>      optional TCP server host
   --tcp-port <port>      optional TCP server port
+  --http-url <url>       optional HTTP health endpoint
+  --metrics-url <url>    optional Prometheus metrics endpoint
   --json                 generate JSON instead of Markdown
   --output <path>        report output path
   -h, --help             show this help
@@ -78,6 +82,12 @@ while [[ $# -gt 0 ]]; do
         --tcp-port)
             [[ $# -ge 2 ]] || argument_error "--tcp-port requires a value"
             TCP_PORT="$2"; shift 2 ;;
+        --http-url)
+            [[ $# -ge 2 ]] || argument_error "--http-url requires a value"
+            HTTP_URL="$2"; shift 2 ;;
+        --metrics-url)
+            [[ $# -ge 2 ]] || argument_error "--metrics-url requires a value"
+            METRICS_URL="$2"; shift 2 ;;
         --json)
             JSON_OUTPUT=true; shift ;;
         --output)
@@ -172,6 +182,46 @@ PY
         return $?
     fi
     return 127
+}
+
+safe_url_label() {
+    local url="$1"
+    python3 - "${url}" <<'PY' 2>/dev/null || printf '<redacted-url>'
+import sys
+from urllib.parse import urlsplit
+
+parts = urlsplit(sys.argv[1])
+host = parts.hostname or ""
+if host not in {"localhost", "127.0.0.1", "::1"}:
+    host = "<redacted-host>"
+port = f":{parts.port}" if parts.port else ""
+print(f"{parts.scheme or 'http'}://{host}{port}{parts.path or '/'}")
+PY
+}
+
+fetch_url() {
+    local url="$1"
+    local body_path="$2"
+    command -v python3 >/dev/null 2>&1 || return 127
+    python3 - "${url}" "${body_path}" <<'PY'
+from pathlib import Path
+import sys
+import urllib.error
+import urllib.request
+
+try:
+    with urllib.request.urlopen(sys.argv[1], timeout=2) as response:
+        status = response.status
+        body = response.read()
+except urllib.error.HTTPError as error:
+    status = error.code
+    body = error.read()
+except OSError:
+    raise SystemExit(1)
+
+Path(sys.argv[2]).write_bytes(body)
+print(status)
+PY
 }
 
 COLLECTED_AT="$(date --iso-8601=seconds 2>/dev/null || date)"
@@ -277,6 +327,45 @@ elif [[ -r "${SERIAL_DEVICE}" && -w "${SERIAL_DEVICE}" ]]; then
     add_check serial "Serial device" PASS "$(safe_path_label "${SERIAL_DEVICE}") is readable and writable"
 else
     add_check serial "Serial device" FAIL "$(safe_path_label "${SERIAL_DEVICE}") lacks read/write access"
+fi
+
+if [[ -z "${HTTP_URL}" ]]; then
+    add_check http "HTTP health endpoint" SKIP "HTTP URL not provided"
+else
+    http_body="$(mktemp /tmp/gateway-health-http.XXXXXX)" \
+        || { echo "[ERROR] cannot create temporary file" >&2; exit 3; }
+    http_status="$(fetch_url "${HTTP_URL}" "${http_body}" 2>/dev/null)"
+    http_result=$?
+    if (( http_result == 127 )); then
+        add_check http "HTTP health endpoint" WARN "python3 not found"
+    elif (( http_result != 0 )); then
+        add_check http "HTTP health endpoint" FAIL "$(safe_url_label "${HTTP_URL}") is unreachable"
+    elif [[ "${http_status}" =~ ^2[0-9][0-9]$ ]]; then
+        add_check http "HTTP health endpoint" PASS "$(safe_url_label "${HTTP_URL}") returned ${http_status}"
+    else
+        add_check http "HTTP health endpoint" FAIL "$(safe_url_label "${HTTP_URL}") returned ${http_status}"
+    fi
+    rm -f -- "${http_body}"
+fi
+
+if [[ -z "${METRICS_URL}" ]]; then
+    add_check metrics "Prometheus metrics endpoint" SKIP "metrics URL not provided"
+else
+    metrics_body="$(mktemp /tmp/gateway-health-metrics.XXXXXX)" \
+        || { echo "[ERROR] cannot create temporary file" >&2; exit 3; }
+    metrics_status="$(fetch_url "${METRICS_URL}" "${metrics_body}" 2>/dev/null)"
+    metrics_result=$?
+    if (( metrics_result == 127 )); then
+        add_check metrics "Prometheus metrics endpoint" WARN "python3 not found"
+    elif (( metrics_result != 0 )); then
+        add_check metrics "Prometheus metrics endpoint" FAIL "$(safe_url_label "${METRICS_URL}") is unreachable"
+    elif [[ "${metrics_status}" =~ ^2[0-9][0-9]$ ]] \
+        && grep -Fq 'iot_gateway_uptime_seconds' "${metrics_body}"; then
+        add_check metrics "Prometheus metrics endpoint" PASS "$(safe_url_label "${METRICS_URL}") exposes gateway metrics"
+    else
+        add_check metrics "Prometheus metrics endpoint" FAIL "status=${metrics_status}; required metric missing"
+    fi
+    rm -f -- "${metrics_body}"
 fi
 
 if (( FAIL_COUNT > 0 )); then

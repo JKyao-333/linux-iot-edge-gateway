@@ -2,6 +2,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <arpa/inet.h>
 #include <algorithm>
 #include <cctype>
 #include <set>
@@ -64,6 +65,19 @@ bool is_valid_log_level(const std::string& level) {
         || level == "INFO"
         || level == "WARN"
         || level == "ERROR";
+}
+
+bool is_valid_http_host(const std::string& host) {
+    if (host == "localhost") {
+        return true;
+    }
+
+    in_addr address{};
+    return inet_pton(
+        AF_INET,
+        host.c_str(),
+        &address
+    ) == 1;
 }
 
 }  // namespace
@@ -245,6 +259,46 @@ bool load_gateway_config(
                 static_cast<std::uint16_t>(tcp_port);
         }
 
+        const YAML::Node http = root["http"];
+
+        if (http) {
+            if (!http.IsMap()) {
+                error_message =
+                    "http must be a YAML map";
+
+                return false;
+            }
+
+            load_if_present(
+                http,
+                "enabled",
+                gateway_config.http.enabled
+            );
+
+            load_if_present(
+                http,
+                "host",
+                gateway_config.http.host
+            );
+
+            int http_port = gateway_config.http.port;
+            load_if_present(
+                http,
+                "port",
+                http_port
+            );
+
+            if (http_port < 1 || http_port > 65535) {
+                error_message =
+                    "http.port must be between 1 and 65535";
+
+                return false;
+            }
+
+            gateway_config.http.port =
+                static_cast<std::uint16_t>(http_port);
+        }
+
         const YAML::Node cache = root["cache"];
 
         if (cache) {
@@ -399,6 +453,23 @@ bool load_gateway_config(
 
             error_message =
                 "tcp.host must not be empty when TCP is enabled";
+
+            return false;
+        }
+
+        if (gateway_config.http.host.empty()) {
+            error_message =
+                "http.host must not be empty";
+
+            return false;
+        }
+
+        if (gateway_config.http.enabled
+            && !is_valid_http_host(
+                gateway_config.http.host)) {
+
+            error_message =
+                "http.host must be localhost or an IPv4 address";
 
             return false;
         }

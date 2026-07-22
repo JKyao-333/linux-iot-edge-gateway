@@ -7,9 +7,18 @@ namespace mqtt {
 
 ReliablePublisher::ReliablePublisher(
     MqttClient& mqtt_client,
-    cache::MessageCache& message_cache)
+    cache::MessageCache& message_cache,
+    app::RuntimeMetrics* runtime_metrics)
     : mqtt_client_(mqtt_client),
-      message_cache_(message_cache) {}
+      message_cache_(message_cache),
+      runtime_metrics_(runtime_metrics) {
+
+    if (runtime_metrics_ != nullptr) {
+        runtime_metrics_->set_cache_depth(
+            message_cache_.load_all().size()
+        );
+    }
+}
 
 PublishResult ReliablePublisher::publish(
     const std::string& topic,
@@ -18,10 +27,25 @@ PublishResult ReliablePublisher::publish(
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (mqtt_client_.publish(topic, payload)) {
+        if (runtime_metrics_ != nullptr) {
+            runtime_metrics_->record_mqtt_publish_success();
+        }
+
         return PublishResult::Published;
     }
 
+    if (runtime_metrics_ != nullptr) {
+        runtime_metrics_->record_mqtt_publish_failed();
+    }
+
     if (message_cache_.append(topic, payload)) {
+        if (runtime_metrics_ != nullptr) {
+            runtime_metrics_->record_cache_enqueue();
+            runtime_metrics_->set_cache_depth(
+                message_cache_.load_all().size()
+            );
+        }
+
         std::cout << "[WARN] mqtt unavailable, message cached"
                   << ", topic=" << topic << std::endl;
 
@@ -41,7 +65,15 @@ std::string_view ReliablePublisher::channel() const noexcept {
 std::size_t ReliablePublisher::flush_cache() {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    if (runtime_metrics_ != nullptr) {
+        runtime_metrics_->record_cache_flush_attempt();
+    }
+
     const auto messages = message_cache_.load_all();
+
+    if (runtime_metrics_ != nullptr) {
+        runtime_metrics_->set_cache_depth(messages.size());
+    }
 
     if (messages.empty()) {
         return 0;
@@ -54,6 +86,10 @@ std::size_t ReliablePublisher::flush_cache() {
                 message.topic,
                 message.payload)) {
 
+            if (runtime_metrics_ != nullptr) {
+                runtime_metrics_->record_mqtt_publish_failed();
+            }
+
             std::cout << "[WARN] cache replay stopped"
                       << ", published=" << published_count
                       << ", remaining="
@@ -61,6 +97,10 @@ std::size_t ReliablePublisher::flush_cache() {
                       << std::endl;
 
             break;
+        }
+
+        if (runtime_metrics_ != nullptr) {
+            runtime_metrics_->record_mqtt_publish_success();
         }
 
         ++published_count;
@@ -75,6 +115,12 @@ std::size_t ReliablePublisher::flush_cache() {
                   << std::endl;
 
         return published_count;
+    }
+
+    if (runtime_metrics_ != nullptr) {
+        runtime_metrics_->set_cache_depth(
+            messages.size() - published_count
+        );
     }
 
     std::cout << "[INFO] cache replay complete"

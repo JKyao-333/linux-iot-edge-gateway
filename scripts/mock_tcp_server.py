@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import socket
+import os
 import sys
 
 
@@ -41,7 +42,7 @@ def handle_client(connection, address):
 
 
 def main():
-    host = "127.0.0.1"
+    host = os.environ.get("TCP_SERVER_HOST", "127.0.0.1")
     port = 9000
 
     if len(sys.argv) >= 2:

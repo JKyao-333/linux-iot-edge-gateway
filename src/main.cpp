@@ -1,10 +1,13 @@
 #include "app/sensor_data.h"
 #include "app/shutdown_signal.h"
+#include "app/runtime_metrics.h"
+#include "app/runtime_status.h"
 #include "cache/file_cache.h"
 #include "cache/message_cache.h"
 #include "cache/sqlite_cache.h"
 #include "config/gateway_config.h"
 #include "log/logger.h"
+#include "http/http_server.h"
 #include "mqtt/mqtt_client.h"
 #include "mqtt/reliable_publisher.h"
 #include "protocol/frame_parser.h"
@@ -204,7 +207,8 @@ void handle_frame(
     const protocol::Frame& frame,
     const std::string& mqtt_topic_prefix,
     publishing::PublisherGroup& publishers,
-    logging::Logger& logger) {
+    logging::Logger& logger,
+    app::RuntimeMetrics& runtime_metrics) {
 
     print_frame(frame);
 
@@ -252,6 +256,16 @@ void handle_frame(
         } else {
             logger.debug(outcome.channel, message);
         }
+
+        if (outcome.channel == "tcp") {
+            if (outcome.status
+                == publishing::PublishStatus::Published) {
+
+                runtime_metrics.record_tcp_publish_success();
+            } else {
+                runtime_metrics.record_tcp_publish_failed();
+            }
+        }
     }
 }
 
@@ -278,7 +292,8 @@ void run_serial_worker(
     const std::string& device,
     const std::string& mqtt_topic_prefix,
     publishing::PublisherGroup& publishers,
-    logging::Logger& logger) {
+    logging::Logger& logger,
+    app::RuntimeMetrics& runtime_metrics) {
 
     const speed_t serial_baud_rate =
         to_termios_baud_rate(
@@ -409,6 +424,13 @@ void run_serial_worker(
             parser.take_crc_error_count();
 
         if (crc_error_count > 0) {
+            runtime_metrics.record_crc_errors(
+                crc_error_count
+            );
+            runtime_metrics.record_frames_invalid(
+                crc_error_count
+            );
+
             logger.warn(
                 "protocol",
                 "CRC validation failed, count="
@@ -420,6 +442,13 @@ void run_serial_worker(
             parser.take_length_error_count();
 
         if (length_error_count > 0) {
+            runtime_metrics.record_length_errors(
+                length_error_count
+            );
+            runtime_metrics.record_frames_invalid(
+                length_error_count
+            );
+
             logger.warn(
                 "protocol",
                 "invalid payload length, count="
@@ -438,12 +467,17 @@ void run_serial_worker(
             );
         }
 
+        runtime_metrics.record_frames_parsed(
+            frames.size()
+        );
+
         for (const auto& frame : frames) {
             handle_frame(
                 frame,
                 mqtt_topic_prefix,
                 publishers,
-                logger
+                logger,
+                runtime_metrics
             );
         }
     }
@@ -459,7 +493,9 @@ void run_serial_worker(
 int run_gateway(
     const config::GatewayConfig& gateway_config,
     const std::vector<std::string>& devices,
-    logging::Logger& logger) {
+    logging::Logger& logger,
+    app::RuntimeStatus& runtime_status,
+    app::RuntimeMetrics& runtime_metrics) {
 
     mqtt::MqttClientOptions mqtt_options;
     mqtt_options.username = gateway_config.mqtt.username;
@@ -505,6 +541,8 @@ int run_gateway(
             );
     }
 
+    runtime_status.set_cache_ready(true);
+
     logger.info(
         "cache",
         "backend=" + gateway_config.cache.type
@@ -513,7 +551,8 @@ int run_gateway(
 
     mqtt::ReliablePublisher mqtt_publisher(
         mqtt_client,
-        *message_cache
+        *message_cache,
+        &runtime_metrics
     );
 
     tcp::TcpClient tcp_client(
@@ -536,6 +575,23 @@ int run_gateway(
             + std::to_string(publishers.size())
     );
 
+    std::unique_ptr<http::HttpServer> http_server;
+
+    if (gateway_config.http.enabled) {
+        http_server = std::make_unique<http::HttpServer>(
+            gateway_config.http.host,
+            gateway_config.http.port,
+            runtime_status,
+            runtime_metrics,
+            logger
+        );
+
+        std::string http_error;
+        if (!http_server->start(http_error)) {
+            return 1;
+        }
+    }
+
     logger.info(
         "cache",
         "checking cached mqtt messages"
@@ -551,6 +607,7 @@ int run_gateway(
             [&gateway_config,
              &publishers,
              &logger,
+             &runtime_metrics,
              device]() {
 
                 run_serial_worker(
@@ -558,7 +615,8 @@ int run_gateway(
                     device,
                     gateway_config.mqtt.topic_prefix,
                     publishers,
-                    logger
+                    logger,
+                    runtime_metrics
                 );
             }
         );
@@ -568,6 +626,14 @@ int run_gateway(
         "serial",
         "worker count="
             + std::to_string(serial_workers.size())
+    );
+
+    runtime_metrics.set_serial_worker_count(
+        serial_workers.size()
+    );
+    runtime_status.set_serial_workers_started(
+        true,
+        serial_workers.size()
     );
 
     const auto cache_retry_interval =
@@ -580,6 +646,15 @@ int run_gateway(
         cache_retry_interval)) {
 
         mqtt_publisher.flush_cache();
+    }
+
+    runtime_status.set_serial_workers_started(
+        false,
+        serial_workers.size()
+    );
+
+    if (http_server != nullptr) {
+        http_server->stop();
     }
 
     for (auto& worker : serial_workers) {
@@ -630,6 +705,15 @@ int main(int argc, char* argv[]) {
         parse_log_level(gateway_config.log.level)
     );
 
+    app::RuntimeMetrics runtime_metrics;
+    app::RuntimeStatus runtime_status(
+        std::string(app::kVersion),
+        gateway_config.cache.type,
+        true,
+        gateway_config.tcp.enabled
+    );
+    runtime_status.set_config_loaded(true);
+
     if (!app::install_shutdown_signal_handlers(
             error_message)) {
 
@@ -655,7 +739,9 @@ int main(int argc, char* argv[]) {
     const int result = run_gateway(
         gateway_config,
         devices,
-        logger
+        logger,
+        runtime_status,
+        runtime_metrics
     );
 
     if (app::shutdown_requested()) {

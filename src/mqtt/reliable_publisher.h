@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include "app/runtime_metrics.h"
 #include "cache/message_cache.h"
 #include "mqtt/mqtt_client.h"
 #include "publisher/publisher.h"
@@ -16,7 +17,8 @@ class ReliablePublisher final : public publishing::Publisher {
 public:
     ReliablePublisher(
         MqttClient& mqtt_client,
-        cache::MessageCache& message_cache
+        cache::MessageCache& message_cache,
+        app::RuntimeMetrics* runtime_metrics = nullptr
     );
 
     PublishResult publish(
@@ -30,6 +32,7 @@ public:
 private:
     MqttClient& mqtt_client_;
     cache::MessageCache& message_cache_;
+    app::RuntimeMetrics* runtime_metrics_;
     std::mutex mutex_;
 };
 
