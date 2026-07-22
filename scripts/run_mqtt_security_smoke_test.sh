@@ -14,6 +14,7 @@ RUNTIME_DIR="$(mktemp -d /tmp/iot-mqtt-security.XXXXXX)"
 USERNAME="gateway-test"
 PASSWORD="temporary-test-password"
 TOPIC="sensor/10/data"
+BROKER_HOST="127.0.0.1"
 BROKER_PID=""
 SUBSCRIBER_PID=""
 
@@ -88,7 +89,7 @@ mosquitto_passwd \
     "${PASSWORD}"
 
 cat >"${RUNTIME_DIR}/mosquitto.conf" <<EOF
-listener ${PORT} 127.0.0.1
+listener ${PORT} ${BROKER_HOST}
 allow_anonymous false
 password_file ${RUNTIME_DIR}/passwords
 cafile ${RUNTIME_DIR}/ca.crt
@@ -124,7 +125,7 @@ if ! ss -lnt | grep -q ":${PORT} "; then
 fi
 
 mosquitto_sub \
-    -h localhost \
+    -h "${BROKER_HOST}" \
     -p "${PORT}" \
     --cafile "${RUNTIME_DIR}/ca.crt" \
     -u "${USERNAME}" \
@@ -139,16 +140,22 @@ sleep 0.2
 
 echo "[INFO] publishing with C++ MQTT TLS client"
 
-"${MQTT_TEST_BIN}" \
-    localhost \
+if ! "${MQTT_TEST_BIN}" \
+    "${BROKER_HOST}" \
     "${PORT}" \
     "${USERNAME}" \
     "${PASSWORD}" \
-    "${RUNTIME_DIR}/ca.crt"
+    "${RUNTIME_DIR}/ca.crt"; then
+
+    echo "[ERROR] C++ MQTT TLS client failed"
+    cat "${RUNTIME_DIR}/broker.log"
+    exit 1
+fi
 
 if ! wait "${SUBSCRIBER_PID}"; then
     SUBSCRIBER_PID=""
     echo "[ERROR] secure MQTT subscriber received no message"
+    cat "${RUNTIME_DIR}/broker.log"
     exit 1
 fi
 
