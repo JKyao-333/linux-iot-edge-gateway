@@ -44,7 +44,7 @@ SocketCAN can_frame --> CanDevice -------+        |
 
 协议解析结果先转换为 `DeviceData`，再由公共转换函数生成并校验 `SensorData`。MQTT/TCP 发布层因此不需要判断数据来自 UART、Modbus RTU 还是 SocketCAN。
 
-当前统一字段包括设备 ID、温度、湿度、气体浓度、电池电压、状态和序号。不同设备寄存器或 CAN Payload 的实际映射应通过设备台账确认后再调整。
+当前统一字段包括设备 ID、温度、湿度、气体浓度、电池电压、状态和序号。不同设备寄存器或 CAN Payload 的实际映射应依据已验证的设备协议和配置调整，并在公开复现证据台账中记录适用范围。
 
 ## 5. 状态管理
 
