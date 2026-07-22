@@ -13,7 +13,8 @@
 - Raspberry Pi 4 Model B 64-bit Linux；
 - FIT IoT-LAB M3 / OpenM3-compatible STM32 node；
 - Docker Compose 本地复现环境；
-- CTest、smoke test、protocol integration test、observability test 和 validation workflow。
+- CTest、smoke test、protocol integration test、observability test 和 validation workflow；
+- GitHub Actions CI，用于云端复现 CMake 构建、CTest、smoke test、observability test、轻量验证工作流、证据摘要生成和 Docker Compose 配置检查。
 
 本地运行可使用以下命令生成脱敏证据摘要：
 
@@ -80,7 +81,8 @@
 2. 三类输入可统一转换为 `SensorData` 并进入 MQTT/TCP 发布链路；
 3. 项目提供 CTest、smoke test、故障注入、稳定性测试、串口 replay、protocol integration、health check、observability test 和 validation workflow；
 4. OpenM3-compatible STM32 node 与 Raspberry Pi 4 可作为公开复现平台，用于验证核心链路；
-5. 未声明工业现场电气层、EMC、量产可靠性、固定吞吐、P99 或 7x24 可用性。
+5. GitHub Actions 提供不依赖真实硬件的云端软件回归路径；
+6. 未声明工业现场电气层、EMC、量产可靠性、固定吞吐、P99 或 7x24 可用性。
 
 ## 7. 当前公开复现路径不声明的内容
 
@@ -90,5 +92,7 @@
 - 不声明固定 Linux kernel version；
 - 不声明固定 TTY 路径；
 - 不声明固定累计帧数、固定 CRC 错误数或固定断线次数；
+- GitHub Actions 不固定声明真实硬件 TTY、OpenM3 固件 commit、物理 RS485/CAN 电气层或长期稳定性；
+- GitHub-hosted runner 上 `vcan0` 可用性取决于 runner 权限；不可用时工作流记录 `SKIP`，由支持 `CAP_NET_ADMIN` 的本地 protocol integration test 补充验证；
 - 原始串口抓包、示波器截图和逻辑分析仪工程文件仅在本地受控保存，未经脱敏和复核不进入版本库；
 - 当前公开复现结论只由本台账列明的公开平台、可执行测试和脱敏摘要支撑。

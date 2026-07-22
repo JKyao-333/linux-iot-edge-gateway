@@ -95,7 +95,15 @@ python3 scripts/sanitize_logs.py \
 
 只记录实际运行得到的测试时长和结果。OpenM3 与 Raspberry Pi 4 是当前公开复现平台，其可公开字段与不声明字段由公开复现证据台账统一说明。
 
-## 5. 结果归档建议
+## 5. GitHub Actions CI
+
+GitHub Actions CI 用于验证公开可复现的软件路径。`native-build-test` 强制执行 CMake Release 构建、CTest、smoke test、HTTP observability test、轻量验证工作流和脱敏证据摘要生成；`script-workflow-check` 执行 Shell/Python 语法检查、公开措辞检查，并在 runner 支持 `vcan0` 时执行三协议集成测试；`docker-compose-check` 执行 Docker Compose 静态配置校验。工作流还保留独立的 ARM64 交叉构建与 QEMU 启动检查。
+
+protocol integration test 需要 `vcan0` 和 `CAP_NET_ADMIN`。GitHub-hosted runner 能创建 `vcan0` 时自动执行，权限不可用时输出明确的 `SKIP` 日志；完整 UART、Modbus RTU、SocketCAN 链路仍可在支持虚拟 CAN 的本地 Linux 环境运行。
+
+CI 不连接真实串口或真实硬件，不使用设备序列号和私有凭据，也不替代 OpenM3 + Raspberry Pi 4 公开复现、物理 RS485/CAN 电气层验证或真实硬件长期测试。
+
+## 6. 结果归档建议
 
 - `artifacts/` 默认不提交；
 - 原始日志和本机环境报告仅在本地受控保存，默认不进入版本库；
@@ -104,7 +112,7 @@ python3 scripts/sanitize_logs.py \
 - 不提交真实串口抓包、数据库、证书、账号、设备序列号、本机绝对路径或未脱敏日志；
 - `data/test_frames/` 只保存合成测试帧，不保存现场真实采集数据。
 
-## 6. 工程边界
+## 7. 工程边界
 
 - 验证工作流用于工程复现、异常趋势观察和用户态链路验证；
 - 不代表工业现场 EMC、电源扰动或极端网络条件；

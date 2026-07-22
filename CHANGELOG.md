@@ -26,6 +26,9 @@
 
 ### 工程验证
 
+- 新增 GitHub Actions CI workflow，覆盖 CMake 构建、CTest、smoke test、HTTP observability test、轻量验证工作流、证据摘要生成和 Docker Compose 配置检查。
+- README 增加 CI 状态 badge。
+- 文档补充 GitHub Actions 与本地 `vcan0` 协议集成测试的验证边界。
 - 新增公开复现证据台账，统一记录公开复现平台、运行环境、协议统计和原始记录归档边界。
 - 统一公开文档措辞，明确当前公开复现证据范围与本地材料归档边界。
 - 新增本地复现证据摘要采集脚本，用于归档 Linux kernel、TTY、测试日期和 artifacts 索引等运行信息。

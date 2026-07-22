@@ -244,7 +244,7 @@ WSL 用户如需使用 Windows D 盘，可显式设置：
 - 部署包：`${AARCH64_TOOLS_ROOT:-$HOME/Tools/linux-iot-edge-gateway}/artifacts/linux-iot-edge-gateway-<version>-aarch64.tar.gz`
 - 校验文件：`${AARCH64_TOOLS_ROOT:-$HOME/Tools/linux-iot-edge-gateway}/artifacts/linux-iot-edge-gateway-<version>-aarch64.tar.gz.sha256`
 
-CI 会在独立的 Ubuntu 22.04 环境中重复执行原生测试和 ARM64 交叉构建，并上传 ARM64 部署包。
+GitHub Actions 会执行 CMake 构建、CTest、smoke test、HTTP observability test、轻量验证工作流、证据摘要生成、Docker Compose 配置检查和 ARM64 交叉构建。依赖 `vcan0` 的协议集成测试会在 runner 具备虚拟 CAN 权限时执行；权限不可用时保留明确的 `SKIP` 日志，并可在支持 `CAP_NET_ADMIN` 的本地 Linux 环境复现。CI 生成的本地验证产物不会提交到仓库。
 
 ## 一键测试
 

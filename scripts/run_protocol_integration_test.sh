@@ -48,17 +48,19 @@ fi
 if ! ip link show "${CAN_INTERFACE}" >/dev/null 2>&1; then
     if [[ "${EUID}" -eq 0 ]]; then
         modprobe vcan 2>/dev/null || true
-        ip link add dev "${CAN_INTERFACE}" type vcan
-        ip link set up "${CAN_INTERFACE}"
+        ip link add dev "${CAN_INTERFACE}" type vcan 2>/dev/null || true
+        ip link set up "${CAN_INTERFACE}" 2>/dev/null || true
     elif sudo -n true >/dev/null 2>&1; then
         sudo -n modprobe vcan 2>/dev/null || true
-        sudo -n ip link add dev "${CAN_INTERFACE}" type vcan
-        sudo -n ip link set up "${CAN_INTERFACE}"
-    else
-        echo "[FAIL] ${CAN_INTERFACE} is absent and CAP_NET_ADMIN is unavailable"
-        echo "[INFO] create it first: sudo modprobe vcan && sudo ip link add dev ${CAN_INTERFACE} type vcan && sudo ip link set up ${CAN_INTERFACE}"
-        exit 1
+        sudo -n ip link add dev "${CAN_INTERFACE}" type vcan 2>/dev/null || true
+        sudo -n ip link set up "${CAN_INTERFACE}" 2>/dev/null || true
     fi
+fi
+
+if ! ip link show "${CAN_INTERFACE}" >/dev/null 2>&1; then
+    echo "[SKIP] ${CAN_INTERFACE} is unavailable; run locally with CAP_NET_ADMIN"
+    echo "[INFO] create it first: sudo modprobe vcan && sudo ip link add dev ${CAN_INTERFACE} type vcan && sudo ip link set up ${CAN_INTERFACE}"
+    exit 2
 fi
 
 cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}"

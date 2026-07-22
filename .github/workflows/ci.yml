@@ -2,23 +2,24 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  native-tests:
-    name: Ubuntu native tests
+  native-build-test:
+    name: Native build and test
     runs-on: ubuntu-22.04
     env:
-      BUILD_DIR: /tmp/linux-iot-edge-gateway-build
+      BUILD_DIR: ${{ github.workspace }}/build
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -26,6 +27,7 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             cmake \
+            git \
             iproute2 \
             libmosquitto-dev \
             libsqlite3-dev \
@@ -35,60 +37,164 @@ jobs:
             openssl \
             pkg-config \
             python3 \
+            python3-pip \
             python3-serial \
             socat \
             sqlite3
+          python3 -m pip install --user pyserial
 
       - name: Start Mosquitto
         shell: bash
         run: |
-          sudo service mosquitto start
-          for attempt in {1..30}; do
-            if ss -lnt | grep -q ':1883'; then
-              exit 0
-            fi
-            sleep 0.2
+          sudo systemctl start mosquitto \
+            || sudo service mosquitto start \
+            || true
+
+          for attempt in {1..20}; do
+            ss -lnt | grep -q ':1883' && break
+            sleep 0.25
           done
-          echo "Mosquitto did not begin listening on port 1883"
+
+          if ! ss -lnt | grep -q ':1883'; then
+            mosquitto -p 1883 -d
+          fi
+
+          for attempt in {1..20}; do
+            ss -lnt | grep -q ':1883' && exit 0
+            sleep 0.25
+          done
+
+          echo "[FAIL] Mosquitto did not begin listening on port 1883"
           exit 1
 
-      - name: Configure and build native targets
+      - name: Configure and build
+        run: |
+          cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "${BUILD_DIR}" --parallel
+
+      - name: Run CTest
+        run: ctest --test-dir "${BUILD_DIR}" --output-on-failure
+
+      - name: Run smoke test
+        run: ./scripts/run_smoke_test.sh
+
+      - name: Run HTTP observability test
+        run: ./scripts/run_observability_test.sh
+
+      - name: Run validation workflow check
+        run: ./scripts/run_validation_workflow_check.sh
+
+      - name: Generate redacted evidence summary
+        run: ./scripts/collect_evidence_summary.sh
+
+  script-workflow-check:
+    name: Script and protocol workflow check
+    runs-on: ubuntu-22.04
+    env:
+      BUILD_DIR: ${{ github.workspace }}/build-protocol
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            iproute2 \
+            kmod \
+            libmosquitto-dev \
+            libsqlite3-dev \
+            libyaml-cpp-dev \
+            mosquitto \
+            mosquitto-clients \
+            pkg-config \
+            python3 \
+            python3-pip \
+            python3-serial \
+            socat \
+            sqlite3
+          python3 -m pip install --user pyserial
+
+      - name: Start Mosquitto
         shell: bash
         run: |
-          set -o pipefail
-          cmake -S . -B "${BUILD_DIR}" 2>&1 | tee native-test.log
-          cmake --build "${BUILD_DIR}" --parallel 2>&1 | tee -a native-test.log
+          sudo systemctl start mosquitto \
+            || sudo service mosquitto start \
+            || true
+          if ! ss -lnt | grep -q ':1883'; then
+            mosquitto -p 1883 -d
+          fi
+          for attempt in {1..20}; do
+            ss -lnt | grep -q ':1883' && exit 0
+            sleep 0.25
+          done
+          echo "[FAIL] Mosquitto did not begin listening on port 1883"
+          exit 1
 
-      - name: Run CTest suite
+      - name: Check shell and Python scripts
+        shell: bash
         run: |
-          ctest --test-dir "${BUILD_DIR}" --output-on-failure \
-            2>&1 | tee -a native-test.log
+          find scripts -maxdepth 1 -type f -name '*.sh' -print0 \
+            | xargs -0 -n1 bash -n
+          python3 -m compileall -q scripts
 
-      - name: Run MQTT authentication and TLS smoke test
-        run: ./scripts/run_mqtt_security_smoke_test.sh 2>&1 | tee -a native-test.log
+      - name: Check public wording
+        shell: bash
+        run: |
+          forbidden_pattern='面''试|简''历|秋''招|求''职|面''试官'
+          unresolved_pattern='待''归档|待''补录|待''补充|手动''补充|待归档''台账字段|历史''实验室|实验室''台账|内部''台账|历史设备''台账|早期''实验室'
 
-      - name: Run graceful shutdown smoke test
-        run: ./scripts/run_shutdown_smoke_test.sh 2>&1 | tee -a native-test.log
+          if grep -R -n -E "${forbidden_pattern}" \
+              README.md docs docker .github/workflows; then
+            echo "[FAIL] forbidden wording found"
+            exit 1
+          fi
 
-      - name: Run cache migration smoke test
-        run: ./scripts/run_cache_migration_test.sh 2>&1 | tee -a native-test.log
+          if grep -R -n -E "${unresolved_pattern}" \
+              README.md docs CHANGELOG.md; then
+            echo "[FAIL] unresolved public evidence wording found"
+            exit 1
+          fi
 
-      - name: Run serial-to-MQTT smoke test
-        run: ./scripts/run_serial_smoke_test.sh 2>&1 | tee -a native-test.log
+      - name: Prepare vcan0 when permitted
+        shell: bash
+        run: |
+          if ! ip link show vcan0 >/dev/null 2>&1; then
+            sudo modprobe vcan 2>/dev/null || true
+            sudo ip link add dev vcan0 type vcan 2>/dev/null || true
+            sudo ip link set up vcan0 2>/dev/null || true
+          fi
 
-      - name: Run multi-serial MQTT smoke test
-        run: ./scripts/run_multi_serial_smoke_test.sh 2>&1 | tee -a native-test.log
+          if ip link show vcan0 >/dev/null 2>&1; then
+            echo "VCAN_AVAILABLE=true" >> "${GITHUB_ENV}"
+            echo "[INFO] vcan0 is available"
+          else
+            echo "VCAN_AVAILABLE=false" >> "${GITHUB_ENV}"
+            echo "[SKIP] vcan0 is unavailable; run locally with CAP_NET_ADMIN"
+          fi
 
-      - name: Run TCP smoke test
-        run: ./scripts/run_tcp_smoke_test.sh 2>&1 | tee -a native-test.log
+      - name: Run protocol integration test
+        if: env.VCAN_AVAILABLE == 'true'
+        run: ./scripts/run_protocol_integration_test.sh
 
-      - name: Upload native test log
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: native-test-log
-          path: native-test.log
-          if-no-files-found: ignore
+      - name: Record protocol integration skip
+        if: env.VCAN_AVAILABLE != 'true'
+        run: echo "[SKIP] vcan0 is unavailable; run locally with CAP_NET_ADMIN"
+
+  docker-compose-check:
+    name: Docker Compose configuration check
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config
 
   aarch64-cross-build:
     name: ARM64 cross build
@@ -96,7 +202,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Install cross-build tools
         run: |
@@ -134,14 +240,14 @@ jobs:
 
       - name: Upload ARM64 build log
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: arm64-build-log
           path: arm64-build.log
           if-no-files-found: ignore
 
       - name: Upload ARM64 deployment package
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: linux-iot-edge-gateway-aarch64
           path: |
